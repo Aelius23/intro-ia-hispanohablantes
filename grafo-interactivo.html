@@ -1424,296 +1424,325 @@ function buildTimeline() {
   tlSvg = d3.select(tlContainer).append('svg')
     .attr('width', W).attr('height', H);
 
-  // Defs for glow filters (reuse from graph)
+  // Defs — glow filters
   const tlDefs = tlSvg.append('defs');
   Object.entries(categoryColors).forEach(([cat, colors]) => {
-    const filter = tlDefs.append('filter').attr('id', `tl-glow-${cat}`);
-    filter.append('feGaussianBlur').attr('stdDeviation', 3).attr('result', 'blur');
-    filter.append('feFlood').attr('flood-color', colors.glow).attr('result', 'color');
-    filter.append('feComposite').attr('in', 'color').attr('in2', 'blur').attr('operator', 'in').attr('result', 'cb');
-    const merge = filter.append('feMerge');
-    merge.append('feMergeNode').attr('in', 'cb');
-    merge.append('feMergeNode').attr('in', 'SourceGraphic');
+    const f = tlDefs.append('filter').attr('id', `tl-glow-${cat}`);
+    f.append('feGaussianBlur').attr('stdDeviation', 2).attr('result', 'b');
+    f.append('feFlood').attr('flood-color', colors.glow).attr('result', 'c');
+    f.append('feComposite').attr('in', 'c').attr('in2', 'b').attr('operator', 'in').attr('result', 'cb');
+    const m = f.append('feMerge');
+    m.append('feMergeNode').attr('in', 'cb');
+    m.append('feMergeNode').attr('in', 'SourceGraphic');
   });
 
   tlG = tlSvg.append('g');
 
-  // Zoom/pan
+  // Zoom/pan — horizontal bias
   tlZoom = d3.zoom()
-    .scaleExtent([0.3, 3])
+    .scaleExtent([0.15, 5])
     .on('zoom', e => tlG.attr('transform', e.transform));
   tlSvg.call(tlZoom);
 
-  renderTimelineBars();
+  renderPremiere();
 
-  // Initial fit
+  // Initial zoom to show full span
   setTimeout(() => {
-    const initialScale = 0.85;
-    const tx = 60;
-    const ty = 30;
-    tlSvg.call(tlZoom.transform, d3.zoomIdentity.translate(tx, ty).scale(initialScale));
-  }, 100);
+    const scale = W / 3800;
+    tlSvg.call(tlZoom.transform, d3.zoomIdentity.translate(20, 10).scale(Math.max(scale, 0.35)));
+  }, 50);
 }
 
-function renderTimelineBars() {
+// ═══════════════════════════════════════
+// TIME SPAN DATA — every node gets a start/end year
+// ═══════════════════════════════════════
+const SPANS = {
+  // INFLEXION
+  '1913-markov-cadenas-texto': [1906, 1920],
+  '1943-neurona-logica-mcculloch-pitts': [1940, 1948],
+  '1948-cibernetica-wiener': [1948, 1960],
+  '1948-teoria-informacion-shannon': [1948, 1960],
+  '1956-dartmouth-artificial-intelligence': [1955, 1960],
+  '1968-gmdh-ivakhnenko-lapa': [1965, 1978],
+  '1986-backpropagation': [1985, 1998],
+  '2012-alexnet-imagenet-gpu': [2012, 2015],
+  '2014-seq2seq-attention': [2014, 2017],
+  '2017-transformer-attention-is-all-you-need': [2017, 2019],
+  '2018-bert-bidirectional-transformers': [2018, 2021],
+  '2018-gpt1-generative-pretraining': [2018, 2020],
+  '2020-gpt3-few-shot-learning': [2020, 2022],
+  '2022-anthropic-constitutional-ai': [2022, 2025],
+  '2022-chatgpt-product-layer': [2022, 2025],
+  // PERSONAS
+  'andrey-markov': [1906, 1922],
+  'mcculloch-pitts': [1940, 1952],
+  'norbert-wiener': [1940, 1964],
+  'claude-shannon': [1937, 1965],
+  'john-mccarthy': [1955, 1975],
+  'marvin-minsky': [1956, 1985],
+  'nathaniel-rochester': [1953, 1962],
+  'frank-rosenblatt': [1957, 1971],
+  'ivakhnenko-lapa': [1962, 1982],
+  'krizhevsky-sutskever-hinton': [2009, 2016],
+  'bahdanau-cho-bengio': [2013, 2017],
+  'vaswani-et-al': [2016, 2020],
+  'viktor-glushkov': [1956, 1982],
+  // CONCEPTOS
+  'probabilidad-condicional': [1900, 1950],
+  'modelos-estadisticos-de-lenguaje': [1948, 1995],
+  'n-gramas': [1948, 2005],
+  'cibernetica': [1948, 1975],
+  'control-automatico': [1940, 1972],
+  'retroalimentacion-feedback': [1940, 1965],
+  'sistemas-adaptativos': [1950, 1978],
+  'teoria-de-automatas': [1936, 1972],
+  'redes-neuronales-tempranas': [1943, 1970],
+  'simbolico-vs-conexionista': [1956, 2005],
+  'ai-winter': [1974, 1993],
+  'modelamiento-inductivo': [1965, 1982],
+  'aprendizaje-automatico': [1980, 2015],
+  'aprendizaje-de-representaciones': [2006, 2020],
+  'deep-learning': [2006, 2025],
+  'gpu-computing': [2007, 2025],
+  'imagenet': [2009, 2017],
+  'redes-neuronales-convolucionales': [1989, 2018],
+  'neural-machine-translation': [2014, 2022],
+  'procesamiento-de-lenguaje-natural': [1950, 2025],
+  'reconocimiento-de-habla': [1952, 2020],
+  'ruido-redundancia-codificacion': [1948, 1972],
+  'base-model-product-layer': [2020, 2025],
+  'prompting-as-specification': [2020, 2025],
+  'verification-as-practice': [2022, 2025],
+  'rlhf-human-feedback': [2017, 2025],
+  'anthropic-ai-safety-alignment': [2016, 2025],
+  'claude-product-layer': [2023, 2025],
+  // ESCENARIOS
+  'lenguaje-probabilidad-estadistica': [1910, 1960],
+  'bell-labs-information-theory': [1925, 1970],
+  'escuela-cibernetica': [1942, 1975],
+  'dartmouth-farm-house': [1955, 1958],
+  'instituto-cibernetica-kiev': [1962, 1990],
+  'deep-learning-gpu-era': [2009, 2025],
+  'google-research-transformers': [2015, 2025],
+  'openai-gpt-product-layer': [2018, 2025],
+  'cybernetics': [1942, 1975],
+};
+
+function renderPremiere() {
   tlG.selectAll('*').remove();
 
-  // Sort inflection points
-  const inflexions = nodes.filter(n => n.category === 'inflexion')
-    .map(n => ({ ...n, year: extractYear(n.id) }))
-    .filter(n => n.year)
-    .sort((a, b) => a.year - b.year);
+  // Timeline range
+  const minYear = 1900;
+  const maxYear = 2027;
+  const pxPerYear = 30;
+  const totalW = (maxYear - minYear) * pxPerYear;
 
-  // Group non-inflexion nodes
-  const eraNodes = new Map();
-  inflexions.forEach(inf => eraNodes.set(inf.year, []));
-  nodes.filter(n => n.category !== 'inflexion').forEach(n => {
-    const era = assignEra(n.id);
-    let closest = inflexions[0].year, minDist = Infinity;
-    inflexions.forEach(inf => {
-      const d = Math.abs(inf.year - era);
-      if (d < minDist) { minDist = d; closest = inf.year; }
-    });
-    if (!eraNodes.has(closest)) eraNodes.set(closest, []);
-    eraNodes.get(closest).push(n);
-  });
+  // Track config
+  const categories = ['inflexion', 'persona', 'concepto', 'escenario'];
+  const trackH = 28;
+  const trackGap = 3;
+  const categoryGap = 14;
+  const rulerH = 50;
+  const labelW = 0; // labels on the bars themselves; ruler is the guide
 
-  // Layout
-  const marginLeft = 140;
-  const barX = marginLeft;
-  const barW = 550;
-  const barH = 40;
-  const childBarH = 30;
-  const childBarW = 480;
-  const childIndent = 50;
-  const gap = 6;
-  const yearW = 120;
-  let y = 40;
+  // ── YEAR RULER ──
+  const rulerG = tlG.append('g').attr('class', 'tl-ruler');
 
-  inflexions.forEach((inf, i) => {
-    const isExpanded = expandedEras.has(inf.id);
-    const children = eraNodes.get(inf.year) || [];
-    const catCol = categoryColors.inflexion.fill;
+  // Ruler background
+  rulerG.append('rect')
+    .attr('x', 0).attr('y', 0)
+    .attr('width', totalW).attr('height', rulerH)
+    .attr('fill', 'rgba(22,27,34,0.95)');
 
-    // ── Year label ──
-    tlG.append('text')
-      .attr('x', barX - 16)
-      .attr('y', y + barH / 2 + 5)
-      .attr('text-anchor', 'end')
-      .attr('font-family', 'Inter, sans-serif')
-      .attr('font-size', '22px')
-      .attr('font-weight', '800')
-      .attr('fill', '#ffffff')
-      .attr('opacity', 0.95)
-      .text(inf.year);
+  // Year ticks
+  for (let yr = 1900; yr <= 2025; yr++) {
+    const x = (yr - minYear) * pxPerYear;
+    const isMajor = yr % 10 === 0;
+    const isMinor = yr % 5 === 0;
 
-    // ── Main inflexion bar ──
-    const barGroup = tlG.append('g')
-      .style('cursor', 'pointer');
+    if (isMajor || isMinor) {
+      rulerG.append('line')
+        .attr('x1', x).attr('y1', isMajor ? rulerH - 20 : rulerH - 12)
+        .attr('x2', x).attr('y2', rulerH)
+        .attr('stroke', isMajor ? 'rgba(255,255,255,0.5)' : 'rgba(255,255,255,0.15)')
+        .attr('stroke-width', isMajor ? 1.5 : 0.5);
+    }
 
-    // Bar background
-    barGroup.append('rect')
-      .attr('x', barX)
-      .attr('y', y)
-      .attr('width', barW)
-      .attr('height', barH)
-      .attr('rx', 8)
-      .attr('fill', catCol)
-      .attr('opacity', 0.15)
-      .attr('stroke', catCol)
-      .attr('stroke-width', 1)
-      .attr('stroke-opacity', 0.4);
-
-    // Colored left accent
-    barGroup.append('rect')
-      .attr('x', barX)
-      .attr('y', y)
-      .attr('width', 5)
-      .attr('height', barH)
-      .attr('rx', 3)
-      .attr('fill', catCol)
-      .attr('opacity', 0.9);
-
-    // Expand/collapse indicator
-    barGroup.append('text')
-      .attr('x', barX + 18)
-      .attr('y', y + barH / 2 + 5)
-      .attr('font-family', 'Inter, sans-serif')
-      .attr('font-size', '12px')
-      .attr('fill', catCol)
-      .attr('opacity', 0.7)
-      .text(isExpanded ? '▾' : '▸');
-
-    // Title
-    const titleText = inf.label[currentLang].replace(/^\d{4}\s*·\s*/, '');
-    barGroup.append('text')
-      .attr('x', barX + 34)
-      .attr('y', y + barH / 2 + 5)
-      .attr('font-family', 'Inter, sans-serif')
-      .attr('font-size', '13px')
-      .attr('font-weight', '600')
-      .attr('fill', '#e6edf3')
-      .text(titleText);
-
-    // Connection count badge
-    if (children.length > 0) {
-      const badge = `${children.length}`;
-      barGroup.append('rect')
-        .attr('x', barX + barW - 42)
-        .attr('y', y + barH / 2 - 9)
-        .attr('width', 28)
-        .attr('height', 18)
-        .attr('rx', 9)
-        .attr('fill', catCol)
-        .attr('opacity', 0.25);
-      barGroup.append('text')
-        .attr('x', barX + barW - 28)
-        .attr('y', y + barH / 2 + 4)
+    if (isMajor) {
+      rulerG.append('text')
+        .attr('x', x).attr('y', rulerH - 26)
         .attr('text-anchor', 'middle')
         .attr('font-family', 'Inter, sans-serif')
-        .attr('font-size', '10px')
-        .attr('font-weight', '600')
-        .attr('fill', catCol)
-        .text(badge);
+        .attr('font-size', '14px')
+        .attr('font-weight', '700')
+        .attr('fill', '#ffffff')
+        .text(yr);
     }
+  }
 
-    // Click: toggle expand
-    barGroup.on('click', (event) => {
-      event.stopPropagation();
-      if (expandedEras.has(inf.id)) {
-        expandedEras.delete(inf.id);
-      } else {
-        expandedEras.add(inf.id);
-      }
-      renderTimelineBars();
-    });
+  // Ruler bottom line
+  rulerG.append('line')
+    .attr('x1', 0).attr('y1', rulerH)
+    .attr('x2', totalW).attr('y2', rulerH)
+    .attr('stroke', 'rgba(255,255,255,0.15)')
+    .attr('stroke-width', 1);
 
-    // Right-click or double-click: open detail panel
-    barGroup.on('dblclick', (event) => {
-      event.stopPropagation();
-      openPanel(inf);
-    });
-    barGroup.on('contextmenu', (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      openPanel(inf);
-    });
-
-    // "View details" icon on right
-    const infoGroup = tlG.append('g')
-      .style('cursor', 'pointer')
-      .on('click', (event) => { event.stopPropagation(); openPanel(inf); });
-
-    infoGroup.append('circle')
-      .attr('cx', barX + barW + 24)
-      .attr('cy', y + barH / 2)
-      .attr('r', 12)
-      .attr('fill', 'rgba(255,255,255,0.04)')
-      .attr('stroke', 'rgba(255,255,255,0.12)')
+  // ── VERTICAL DECADE LINES ──
+  for (let yr = 1900; yr <= 2030; yr += 10) {
+    const x = (yr - minYear) * pxPerYear;
+    tlG.append('line')
+      .attr('x1', x).attr('y1', rulerH)
+      .attr('x2', x).attr('y2', 2000)
+      .attr('stroke', 'rgba(255,255,255,0.04)')
       .attr('stroke-width', 1);
-    infoGroup.append('text')
-      .attr('x', barX + barW + 24)
-      .attr('y', y + barH / 2 + 4)
-      .attr('text-anchor', 'middle')
+  }
+
+  // ── PACK BARS INTO TRACKS ──
+  // For each category, bin-pack bars so they don't overlap
+  let currentY = rulerH + 12;
+
+  categories.forEach(cat => {
+    const catNodes = nodes.filter(n => n.category === cat);
+    const catCol = categoryColors[cat];
+    const catLabel = categoryLabels[cat][currentLang];
+
+    // Get spans
+    const bars = catNodes.map(n => {
+      const span = SPANS[n.id] || [assignEra(n.id), assignEra(n.id) + 5];
+      return { node: n, start: span[0], end: span[1] };
+    }).sort((a, b) => a.start - b.start);
+
+    // Greedy bin-pack into lanes
+    const lanes = []; // each lane is an array of occupied [end] values
+    bars.forEach(bar => {
+      let placed = false;
+      for (let i = 0; i < lanes.length; i++) {
+        if (bar.start >= lanes[i]) {
+          lanes[i] = bar.end;
+          bar.lane = i;
+          placed = true;
+          break;
+        }
+      }
+      if (!placed) {
+        bar.lane = lanes.length;
+        lanes.push(bar.end);
+      }
+    });
+
+    const numLanes = Math.max(lanes.length, 1);
+
+    // Category label area
+    const catHeaderY = currentY;
+    tlG.append('text')
+      .attr('x', 8)
+      .attr('y', catHeaderY + 12)
       .attr('font-family', 'Inter, sans-serif')
-      .attr('font-size', '11px')
-      .attr('fill', 'rgba(230,237,243,0.5)')
-      .text('i');
+      .attr('font-size', '9px')
+      .attr('font-weight', '700')
+      .attr('text-transform', 'uppercase')
+      .attr('letter-spacing', '0.08em')
+      .attr('fill', catCol.fill)
+      .attr('opacity', 0.6)
+      .text(catLabel.toUpperCase());
 
-    y += barH + gap;
+    // Category left accent line
+    const trackBlockH = numLanes * (trackH + trackGap);
+    tlG.append('rect')
+      .attr('x', 2).attr('y', catHeaderY + 18)
+      .attr('width', 3).attr('height', trackBlockH)
+      .attr('rx', 1.5)
+      .attr('fill', catCol.fill)
+      .attr('opacity', 0.3);
 
-    // ── Expanded children ──
-    if (isExpanded && children.length > 0) {
-      // Sort by category
-      children.sort((a, b) => {
-        const catOrder = { persona: 0, concepto: 1, escenario: 2 };
-        return (catOrder[a.category] ?? 3) - (catOrder[b.category] ?? 3);
-      });
-
-      children.forEach((child, j) => {
-        const cc = categoryColors[child.category];
-
-        const childGroup = tlG.append('g')
-          .style('cursor', 'pointer')
-          .on('click', (event) => {
-            event.stopPropagation();
-            openPanel(child);
-          });
-
-        // Child bar bg
-        childGroup.append('rect')
-          .attr('x', barX + childIndent)
-          .attr('y', y)
-          .attr('width', childBarW)
-          .attr('height', childBarH)
-          .attr('rx', 6)
-          .attr('fill', cc.fill)
-          .attr('opacity', 0.08)
-          .attr('stroke', cc.fill)
-          .attr('stroke-width', 0.5)
-          .attr('stroke-opacity', 0.3);
-
-        // Colored left accent
-        childGroup.append('rect')
-          .attr('x', barX + childIndent)
-          .attr('y', y)
-          .attr('width', 4)
-          .attr('height', childBarH)
-          .attr('rx', 2)
-          .attr('fill', cc.fill)
-          .attr('opacity', 0.7);
-
-        // Category dot
-        childGroup.append('circle')
-          .attr('cx', barX + childIndent + 18)
-          .attr('cy', y + childBarH / 2)
-          .attr('r', 3)
-          .attr('fill', cc.fill)
-          .attr('filter', `url(#tl-glow-${child.category})`);
-
-        // Label
-        childGroup.append('text')
-          .attr('x', barX + childIndent + 30)
-          .attr('y', y + childBarH / 2 + 4)
-          .attr('font-family', 'Inter, sans-serif')
-          .attr('font-size', '11px')
-          .attr('font-weight', '500')
-          .attr('fill', 'rgba(230,237,243,0.75)')
-          .text(child.label[currentLang]);
-
-        // Category label on right
-        childGroup.append('text')
-          .attr('x', barX + childIndent + childBarW - 12)
-          .attr('y', y + childBarH / 2 + 3)
-          .attr('text-anchor', 'end')
-          .attr('font-family', 'Inter, sans-serif')
-          .attr('font-size', '9px')
-          .attr('font-weight', '500')
-          .attr('fill', cc.fill)
-          .attr('opacity', 0.5)
-          .text(categoryLabels[child.category][currentLang]);
-
-        // Hover effect
-        childGroup.on('mouseover', function() {
-          d3.select(this).select('rect').attr('opacity', 0.18);
-          d3.select(this).selectAll('text').filter(function() {
-            return d3.select(this).attr('font-size') === '11px';
-          }).attr('fill', '#fff');
-        }).on('mouseout', function() {
-          d3.select(this).select('rect').attr('opacity', 0.08);
-          d3.select(this).selectAll('text').filter(function() {
-            return d3.select(this).attr('font-size') === '11px';
-          }).attr('fill', 'rgba(230,237,243,0.75)');
-        });
-
-        y += childBarH + 3;
-      });
-
-      y += 8; // extra gap after expanded section
+    // Track background bands
+    for (let lane = 0; lane < numLanes; lane++) {
+      const ly = catHeaderY + 18 + lane * (trackH + trackGap);
+      tlG.append('rect')
+        .attr('x', 0).attr('y', ly)
+        .attr('width', totalW).attr('height', trackH)
+        .attr('fill', lane % 2 === 0 ? 'rgba(255,255,255,0.012)' : 'rgba(255,255,255,0.025)')
+        .attr('rx', 2);
     }
+
+    // Draw bars
+    bars.forEach(bar => {
+      const x1 = (bar.start - minYear) * pxPerYear;
+      const x2 = (bar.end - minYear) * pxPerYear;
+      const bw = Math.max(x2 - x1, 20); // min bar width
+      const by = catHeaderY + 18 + bar.lane * (trackH + trackGap);
+      const n = bar.node;
+
+      const barG = tlG.append('g')
+        .style('cursor', 'pointer');
+
+      // Bar fill
+      barG.append('rect')
+        .attr('x', x1).attr('y', by)
+        .attr('width', bw).attr('height', trackH)
+        .attr('rx', 4)
+        .attr('fill', catCol.fill)
+        .attr('opacity', 0.22)
+        .attr('stroke', catCol.fill)
+        .attr('stroke-width', 0.5)
+        .attr('stroke-opacity', 0.5);
+
+      // Bright left edge
+      barG.append('rect')
+        .attr('x', x1).attr('y', by)
+        .attr('width', 3).attr('height', trackH)
+        .attr('rx', 1.5)
+        .attr('fill', catCol.fill)
+        .attr('opacity', 0.85);
+
+      // Label text (clip to bar)
+      const clipId = `clip-${n.id.replace(/[^a-z0-9]/gi, '')}`;
+      tlG.append('clipPath').attr('id', clipId)
+        .append('rect')
+        .attr('x', x1 + 8).attr('y', by)
+        .attr('width', Math.max(bw - 12, 1)).attr('height', trackH);
+
+      barG.append('text')
+        .attr('x', x1 + 10)
+        .attr('y', by + trackH / 2 + 4)
+        .attr('font-family', 'Inter, sans-serif')
+        .attr('font-size', '10px')
+        .attr('font-weight', '500')
+        .attr('fill', 'rgba(230,237,243,0.85)')
+        .attr('clip-path', `url(#${clipId})`)
+        .text(n.label[currentLang]);
+
+      // Hover effect
+      barG.on('mouseover', function(event) {
+        d3.select(this).select('rect').attr('opacity', 0.45);
+        d3.select(this).selectAll('text').attr('fill', '#fff');
+        // Show tooltip
+        tooltip.textContent = n.label[currentLang];
+        tooltip.classList.add('visible');
+        tooltip.style.left = (event.clientX + 14) + 'px';
+        tooltip.style.top = (event.clientY - 10) + 'px';
+      })
+      .on('mousemove', function(event) {
+        tooltip.style.left = (event.clientX + 14) + 'px';
+        tooltip.style.top = (event.clientY - 10) + 'px';
+      })
+      .on('mouseout', function() {
+        d3.select(this).select('rect').attr('opacity', 0.22);
+        d3.select(this).selectAll('text').attr('fill', 'rgba(230,237,243,0.85)');
+        tooltip.classList.remove('visible');
+      });
+
+      // Click → detail panel
+      barG.on('click', (event) => {
+        event.stopPropagation();
+        openPanel(n);
+      });
+    });
+
+    currentY = catHeaderY + 18 + trackBlockH + categoryGap;
   });
 
-  // Click background to close panel
+  // Click background to close
   tlSvg.on('click', () => closePanel());
 }
 
@@ -1758,7 +1787,7 @@ window.setLang = function(lang) {
   document.getElementById('scroll-hint').textContent = lang === 'es'
     ? '← Arrastra y usa scroll para zoom →'
     : '← Drag and scroll to zoom →';
-  if (timelineBuilt) renderTimelineBars();
+  if (timelineBuilt) { timelineBuilt = false; buildTimeline(); }
 };
 </script>
 </body>
