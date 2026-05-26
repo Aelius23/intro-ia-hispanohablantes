@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" ?>
+<rss version="2.0">
+    <channel>
+      <title>Genealogía de la IA</title>
+      <link>https://aelius23.github.io/intro-ia-hispanohablantes</link>
+      <description>Last 10 notes on Genealogía de la IA</description>
+      <generator>Quartz -- quartz.jzhao.xyz</generator>
+      <item>
+    <title>conceptos</title>
+    <link>https://aelius23.github.io/intro-ia-hispanohablantes/conceptos/</link>
+    <guid>https://aelius23.github.io/intro-ia-hispanohablantes/conceptos/</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Tue, 26 May 2026 21:13:45 GMT</pubDate>
+  </item><item>
+    <title>escenarios</title>
+    <link>https://aelius23.github.io/intro-ia-hispanohablantes/escenarios/</link>
+    <guid>https://aelius23.github.io/intro-ia-hispanohablantes/escenarios/</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Tue, 26 May 2026 21:13:45 GMT</pubDate>
+  </item><item>
+    <title>inflexion</title>
+    <link>https://aelius23.github.io/intro-ia-hispanohablantes/inflexion/</link>
+    <guid>https://aelius23.github.io/intro-ia-hispanohablantes/inflexion/</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Tue, 26 May 2026 21:13:45 GMT</pubDate>
+  </item><item>
+    <title>personas</title>
+    <link>https://aelius23.github.io/intro-ia-hispanohablantes/personas/</link>
+    <guid>https://aelius23.github.io/intro-ia-hispanohablantes/personas/</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Tue, 26 May 2026 21:13:45 GMT</pubDate>
+  </item><item>
+    <title>Índice de Etiquetas</title>
+    <link>https://aelius23.github.io/intro-ia-hispanohablantes/tags/</link>
+    <guid>https://aelius23.github.io/intro-ia-hispanohablantes/tags/</guid>
+    <description><![CDATA[  ]]></description>
+    <pubDate>Tue, 26 May 2026 21:13:45 GMT</pubDate>
+  </item><item>
+    <title>1948-teoria-informacion-shannon</title>
+    <link>https://aelius23.github.io/intro-ia-hispanohablantes/inflexion/1948-teoria-informacion-shannon</link>
+    <guid>https://aelius23.github.io/intro-ia-hispanohablantes/inflexion/1948-teoria-informacion-shannon</guid>
+    <description><![CDATA[ En 1948, Claude Shannon publicó A Mathematical Theory of Communication en el Bell System Technical Journal. ]]></description>
+    <pubDate>Tue, 26 May 2026 21:09:53 GMT</pubDate>
+  </item><item>
+    <title>2012-alexnet-imagenet-gpu</title>
+    <link>https://aelius23.github.io/intro-ia-hispanohablantes/inflexion/2012-alexnet-imagenet-gpu</link>
+    <guid>https://aelius23.github.io/intro-ia-hispanohablantes/inflexion/2012-alexnet-imagenet-gpu</guid>
+    <description><![CDATA[ 2012: AlexNet, ImageNet y GPU En 2012, Alex Krizhevsky, Ilya Sutskever y Geoffrey Hinton presentaron AlexNet en la competencia ImageNet Large Scale Visual Recognition Challenge. ]]></description>
+    <pubDate>Tue, 26 May 2026 21:09:53 GMT</pubDate>
+  </item><item>
+    <title>2018-bert-bidirectional-transformers</title>
+    <link>https://aelius23.github.io/intro-ia-hispanohablantes/inflexion/2018-bert-bidirectional-transformers</link>
+    <guid>https://aelius23.github.io/intro-ia-hispanohablantes/inflexion/2018-bert-bidirectional-transformers</guid>
+    <description><![CDATA[ 2018: BERT y Transformers bidireccionales En 2018, Jacob Devlin, Ming-Wei Chang, Kenton Lee y Kristina Toutanova, desde Google AI Language, presentaron BERT: Bidirectional Encoder Representations from Transformers. ]]></description>
+    <pubDate>Tue, 26 May 2026 21:09:53 GMT</pubDate>
+  </item><item>
+    <title>1913-markov-cadenas-texto</title>
+    <link>https://aelius23.github.io/intro-ia-hispanohablantes/inflexion/1913-markov-cadenas-texto</link>
+    <guid>https://aelius23.github.io/intro-ia-hispanohablantes/inflexion/1913-markov-cadenas-texto</guid>
+    <description><![CDATA[ En 1913, Andrey Markov aplicó su trabajo sobre procesos probabilísticos al análisis de Eugene Onegin, de Alexander Pushkin. ]]></description>
+    <pubDate>Tue, 26 May 2026 21:09:53 GMT</pubDate>
+  </item><item>
+    <title>2017-transformer-attention-is-all-you-need</title>
+    <link>https://aelius23.github.io/intro-ia-hispanohablantes/inflexion/2017-transformer-attention-is-all-you-need</link>
+    <guid>https://aelius23.github.io/intro-ia-hispanohablantes/inflexion/2017-transformer-attention-is-all-you-need</guid>
+    <description><![CDATA[ 2017: Transformer y Attention Is All You Need En 2017, Ashish Vaswani, Noam Shazeer, Niki Parmar, Jakob Uszkoreit, Llion Jones, Aidan N. ]]></description>
+    <pubDate>Tue, 26 May 2026 21:09:53 GMT</pubDate>
+  </item>
+    </channel>
+  </rss>
