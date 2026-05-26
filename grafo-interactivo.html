@@ -1446,10 +1446,13 @@ function buildTimeline() {
 
   renderPremiere();
 
-  // Initial zoom to show full span
+  // Initial zoom to show ~25 years (readable window)
   setTimeout(() => {
-    const scale = W / 3800;
-    tlSvg.call(tlZoom.transform, d3.zoomIdentity.translate(20, 10).scale(Math.max(scale, 0.35)));
+    const viewYears = 25;
+    const targetScale = W / (viewYears * pxPerYear);
+    const startYear = 1940; // center on the mid-century action
+    const tx = -(startYear - 1900) * pxPerYear * targetScale + 40;
+    tlSvg.call(tlZoom.transform, d3.zoomIdentity.translate(tx, 10).scale(targetScale));
   }, 50);
 }
 
@@ -1534,20 +1537,20 @@ function renderPremiere() {
   // Timeline range
   const minYear = 1900;
   const maxYear = 2027;
-  const pxPerYear = 55;
+  const pxPerYear = 100; // 25 years = 2500px ≈ screen width
   const totalW = (maxYear - minYear) * pxPerYear;
 
-  // Track config — single pool, all categories mixed
-  const trackH = 38;
-  const trackGap = 4;
-  const rulerH = 60;
+  // WCAG-informed sizing
+  const trackH = 56;     // tall enough for 16px text + padding
+  const trackGap = 5;
+  const rulerH = 70;
 
-  // Solid category fills (no transparency)
+  // High-contrast fills: dark enough bg for white text (4.5:1+)
   const solidFills = {
-    inflexion: { bg: '#6b201d', text: '#ffd4d2', accent: '#f85149' },
-    persona:   { bg: '#1a4d24', text: '#c8f7d0', accent: '#3fb950' },
-    concepto:  { bg: '#143558', text: '#c8e1ff', accent: '#58a6ff' },
-    escenario: { bg: '#503d10', text: '#ffe6a7', accent: '#d29922' },
+    inflexion: { bg: '#5c1a17', hover: '#8b2e28', text: '#ffffff', accent: '#f85149' },
+    persona:   { bg: '#143d1e', hover: '#1e5e2d', text: '#ffffff', accent: '#3fb950' },
+    concepto:  { bg: '#0f2d4d', hover: '#174878', text: '#ffffff', accent: '#58a6ff' },
+    escenario: { bg: '#45340d', hover: '#6b500f', text: '#ffffff', accent: '#d29922' },
   };
 
   // ── YEAR RULER ──
@@ -1561,28 +1564,39 @@ function renderPremiere() {
   for (let yr = 1900; yr <= 2025; yr++) {
     const x = (yr - minYear) * pxPerYear;
     const isMajor = yr % 10 === 0;
-    const isMinor = yr % 5 === 0;
+    const isMid = yr % 5 === 0;
 
     if (isMajor) {
-      // Major tick
       rulerG.append('line')
-        .attr('x1', x).attr('y1', rulerH - 28)
+        .attr('x1', x).attr('y1', rulerH - 35)
         .attr('x2', x).attr('y2', rulerH)
         .attr('stroke', '#ffffff').attr('stroke-width', 2);
-      // Year label
       rulerG.append('text')
-        .attr('x', x).attr('y', rulerH - 34)
+        .attr('x', x).attr('y', rulerH - 42)
         .attr('text-anchor', 'middle')
         .attr('font-family', 'Inter, sans-serif')
-        .attr('font-size', '22px')
+        .attr('font-size', '28px')
         .attr('font-weight', '800')
         .attr('fill', '#ffffff')
         .text(yr);
-    } else if (isMinor) {
+    } else if (isMid) {
       rulerG.append('line')
-        .attr('x1', x).attr('y1', rulerH - 14)
+        .attr('x1', x).attr('y1', rulerH - 18)
         .attr('x2', x).attr('y2', rulerH)
-        .attr('stroke', '#484f58').attr('stroke-width', 1);
+        .attr('stroke', '#6e7681').attr('stroke-width', 1);
+      rulerG.append('text')
+        .attr('x', x).attr('y', rulerH - 22)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', 'Inter, sans-serif')
+        .attr('font-size', '16px')
+        .attr('font-weight', '600')
+        .attr('fill', '#8b949e')
+        .text(yr);
+    } else {
+      rulerG.append('line')
+        .attr('x1', x).attr('y1', rulerH - 8)
+        .attr('x2', x).attr('y2', rulerH)
+        .attr('stroke', '#30363d').attr('stroke-width', 1);
     }
   }
 
@@ -1592,22 +1606,23 @@ function renderPremiere() {
     .attr('x2', totalW).attr('y2', rulerH)
     .attr('stroke', '#30363d').attr('stroke-width', 2);
 
-  // ── VERTICAL GRIDLINES (decades) ──
-  for (let yr = 1900; yr <= 2030; yr += 10) {
+  // ── VERTICAL GRIDLINES ──
+  for (let yr = 1900; yr <= 2030; yr += 5) {
     const x = (yr - minYear) * pxPerYear;
+    const isMajor = yr % 10 === 0;
     tlG.append('line')
       .attr('x1', x).attr('y1', rulerH)
-      .attr('x2', x).attr('y2', 4000)
-      .attr('stroke', '#1c2028').attr('stroke-width', 1);
+      .attr('x2', x).attr('y2', 5000)
+      .attr('stroke', isMajor ? '#21262d' : '#161b22')
+      .attr('stroke-width', isMajor ? 1.5 : 0.5);
   }
 
-  // ── COLLECT ALL BARS sorted by start year ──
+  // ── COLLECT & BIN-PACK ALL BARS ──
   const allBars = nodes.map(n => {
     const span = SPANS[n.id] || [assignEra(n.id), assignEra(n.id) + 5];
     return { node: n, start: span[0], end: span[1] };
   }).sort((a, b) => a.start - b.start || a.end - b.end);
 
-  // Greedy bin-pack into lanes (single pool)
   const lanes = [];
   allBars.forEach(bar => {
     let placed = false;
@@ -1629,39 +1644,40 @@ function renderPremiere() {
   allBars.forEach(bar => {
     const x1 = (bar.start - minYear) * pxPerYear;
     const x2 = (bar.end - minYear) * pxPerYear;
-    const bw = Math.max(x2 - x1, pxPerYear * 2); // min 2 years wide
-    const by = rulerH + 8 + bar.lane * (trackH + trackGap);
+    const bw = Math.max(x2 - x1, pxPerYear * 2);
+    const by = rulerH + 10 + bar.lane * (trackH + trackGap);
     const n = bar.node;
     const fills = solidFills[n.category];
 
     const barG = tlG.append('g').style('cursor', 'pointer');
 
-    // Solid bar background
+    // Solid bar
     barG.append('rect')
       .attr('x', x1).attr('y', by)
       .attr('width', bw).attr('height', trackH)
-      .attr('rx', 5)
+      .attr('rx', 6)
       .attr('fill', fills.bg);
 
-    // Left accent edge
+    // Left accent
     barG.append('rect')
       .attr('x', x1).attr('y', by)
-      .attr('width', 4).attr('height', trackH)
-      .attr('rx', 2)
+      .attr('width', 5).attr('height', trackH)
+      .attr('rx', 2.5)
       .attr('fill', fills.accent);
 
-    // Label text (clipped to bar)
-    const clipId = `clip-${n.id.replace(/[^a-z0-9]/gi, '')}`;
+    // Clip path for text
+    const clipId = `c${n.id.replace(/[^a-z0-9]/gi, '')}`;
     tlG.append('clipPath').attr('id', clipId)
       .append('rect')
-      .attr('x', x1 + 10).attr('y', by)
-      .attr('width', Math.max(bw - 14, 1)).attr('height', trackH);
+      .attr('x', x1 + 12).attr('y', by)
+      .attr('width', Math.max(bw - 18, 1)).attr('height', trackH);
 
+    // Label — 16px semibold white
     barG.append('text')
-      .attr('x', x1 + 12)
-      .attr('y', by + trackH / 2 + 5)
+      .attr('x', x1 + 16)
+      .attr('y', by + trackH / 2 + 6)
       .attr('font-family', 'Inter, sans-serif')
-      .attr('font-size', '13px')
+      .attr('font-size', '16px')
       .attr('font-weight', '600')
       .attr('fill', fills.text)
       .attr('clip-path', `url(#${clipId})`)
@@ -1669,8 +1685,7 @@ function renderPremiere() {
 
     // Hover
     barG.on('mouseover', function(event) {
-      d3.select(this).select('rect').attr('fill', fills.accent);
-      d3.select(this).selectAll('text').attr('fill', '#fff');
+      d3.select(this).selectAll('rect').filter(function(d, i) { return i === 0; }).attr('fill', fills.hover);
       tooltip.textContent = n.label[currentLang];
       tooltip.classList.add('visible');
       tooltip.style.left = (event.clientX + 14) + 'px';
@@ -1681,8 +1696,7 @@ function renderPremiere() {
       tooltip.style.top = (event.clientY - 10) + 'px';
     })
     .on('mouseout', function() {
-      d3.select(this).select('rect').attr('fill', fills.bg);
-      d3.select(this).selectAll('text').attr('fill', fills.text);
+      d3.select(this).selectAll('rect').filter(function(d, i) { return i === 0; }).attr('fill', fills.bg);
       tooltip.classList.remove('visible');
     });
 
