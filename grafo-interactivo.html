@@ -1438,23 +1438,38 @@ function buildTimeline() {
 
   tlG = tlSvg.append('g');
 
-  // Zoom/pan — horizontal bias
+  // Year labels group (separate so we can rescale independently)
+  const yearLabelsG = tlG.append('g').attr('class', 'year-labels');
+
+  // Zoom/pan with dynamic year label scaling
+  let currentScale = 1;
   tlZoom = d3.zoom()
-    .scaleExtent([0.15, 5])
-    .on('zoom', e => tlG.attr('transform', e.transform));
+    .scaleExtent([0.08, 5])
+    .on('zoom', e => {
+      tlG.attr('transform', e.transform);
+      currentScale = e.transform.k;
+      // Scale year labels inversely — they stay readable at any zoom
+      yearLabelsG.selectAll('text').each(function() {
+        const baseSize = +d3.select(this).attr('data-base-size');
+        d3.select(this).attr('font-size', (baseSize / currentScale) + 'px');
+      });
+    });
   tlSvg.call(tlZoom);
 
-  renderPremiere();
+  renderPremiere(yearLabelsG);
 
-  // Initial zoom to show ~25 years (readable window)
+  // Initial zoom: show ~25 years centered on 1945
   setTimeout(() => {
     const viewYears = 25;
-    const targetScale = W / (viewYears * pxPerYear);
-    const startYear = 1940; // center on the mid-century action
-    const tx = -(startYear - 1900) * pxPerYear * targetScale + 40;
+    const targetScale = W / (viewYears * TL_PX_PER_YEAR);
+    const startYear = 1942;
+    const tx = -(startYear - 1900) * TL_PX_PER_YEAR * targetScale + 40;
     tlSvg.call(tlZoom.transform, d3.zoomIdentity.translate(tx, 10).scale(targetScale));
   }, 50);
 }
+
+// Global timeline constants
+const TL_PX_PER_YEAR = 100;
 
 // ═══════════════════════════════════════
 // TIME SPAN DATA — every node gets a start/end year
@@ -1531,21 +1546,19 @@ const SPANS = {
   'cybernetics': [1942, 1975],
 };
 
-function renderPremiere() {
-  tlG.selectAll('*').remove();
+function renderPremiere(yearLabelsG) {
+  tlG.selectAll('.tl-content').remove();
+  const contentG = tlG.append('g').attr('class', 'tl-content');
 
-  // Timeline range
   const minYear = 1900;
   const maxYear = 2027;
-  const pxPerYear = 100; // 25 years = 2500px ≈ screen width
+  const pxPerYear = TL_PX_PER_YEAR;
   const totalW = (maxYear - minYear) * pxPerYear;
 
-  // WCAG-informed sizing
-  const trackH = 56;     // tall enough for 16px text + padding
-  const trackGap = 5;
-  const rulerH = 70;
+  const trackH = 80;
+  const trackGap = 6;
+  const rulerH = 90;
 
-  // High-contrast fills: dark enough bg for white text (4.5:1+)
   const solidFills = {
     inflexion: { bg: '#5c1a17', hover: '#8b2e28', text: '#ffffff', accent: '#f85149' },
     persona:   { bg: '#143d1e', hover: '#1e5e2d', text: '#ffffff', accent: '#3fb950' },
@@ -1553,71 +1566,83 @@ function renderPremiere() {
     escenario: { bg: '#45340d', hover: '#6b500f', text: '#ffffff', accent: '#d29922' },
   };
 
-  // ── YEAR RULER ──
-  const rulerG = tlG.append('g');
-
-  rulerG.append('rect')
-    .attr('x', 0).attr('y', 0)
-    .attr('width', totalW).attr('height', rulerH)
+  // ── RULER BACKGROUND ──
+  contentG.append('rect')
+    .attr('x', -500).attr('y', 0)
+    .attr('width', totalW + 1000).attr('height', rulerH)
     .attr('fill', '#0d1117');
 
+  // ── RULER TICKS ──
   for (let yr = 1900; yr <= 2025; yr++) {
     const x = (yr - minYear) * pxPerYear;
     const isMajor = yr % 10 === 0;
     const isMid = yr % 5 === 0;
 
     if (isMajor) {
-      rulerG.append('line')
-        .attr('x1', x).attr('y1', rulerH - 35)
+      contentG.append('line')
+        .attr('x1', x).attr('y1', rulerH - 40)
         .attr('x2', x).attr('y2', rulerH)
         .attr('stroke', '#ffffff').attr('stroke-width', 2);
-      rulerG.append('text')
-        .attr('x', x).attr('y', rulerH - 42)
-        .attr('text-anchor', 'middle')
-        .attr('font-family', 'Inter, sans-serif')
-        .attr('font-size', '28px')
-        .attr('font-weight', '800')
-        .attr('fill', '#ffffff')
-        .text(yr);
     } else if (isMid) {
-      rulerG.append('line')
-        .attr('x1', x).attr('y1', rulerH - 18)
+      contentG.append('line')
+        .attr('x1', x).attr('y1', rulerH - 20)
         .attr('x2', x).attr('y2', rulerH)
         .attr('stroke', '#6e7681').attr('stroke-width', 1);
-      rulerG.append('text')
-        .attr('x', x).attr('y', rulerH - 22)
-        .attr('text-anchor', 'middle')
-        .attr('font-family', 'Inter, sans-serif')
-        .attr('font-size', '16px')
-        .attr('font-weight', '600')
-        .attr('fill', '#8b949e')
-        .text(yr);
     } else {
-      rulerG.append('line')
-        .attr('x1', x).attr('y1', rulerH - 8)
+      contentG.append('line')
+        .attr('x1', x).attr('y1', rulerH - 10)
         .attr('x2', x).attr('y2', rulerH)
         .attr('stroke', '#30363d').attr('stroke-width', 1);
     }
   }
 
-  // Ruler bottom line
-  rulerG.append('line')
-    .attr('x1', 0).attr('y1', rulerH)
-    .attr('x2', totalW).attr('y2', rulerH)
+  contentG.append('line')
+    .attr('x1', -500).attr('y1', rulerH)
+    .attr('x2', totalW + 500).attr('y2', rulerH)
     .attr('stroke', '#30363d').attr('stroke-width', 2);
 
-  // ── VERTICAL GRIDLINES ──
+  // ── YEAR LABELS (dynamic-scaling) ──
+  yearLabelsG.selectAll('*').remove();
+  for (let yr = 1900; yr <= 2025; yr++) {
+    const x = (yr - minYear) * pxPerYear;
+    const isMajor = yr % 10 === 0;
+    const isMid = yr % 5 === 0;
+
+    if (isMajor) {
+      yearLabelsG.append('text')
+        .attr('x', x).attr('y', rulerH - 46)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', 'Helvetica, Arial, sans-serif')
+        .attr('font-size', '32px')
+        .attr('data-base-size', 32)
+        .attr('font-weight', '700')
+        .attr('fill', '#ffffff')
+        .text(yr);
+    } else if (isMid) {
+      yearLabelsG.append('text')
+        .attr('x', x).attr('y', rulerH - 24)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', 'Helvetica, Arial, sans-serif')
+        .attr('font-size', '18px')
+        .attr('data-base-size', 18)
+        .attr('font-weight', '400')
+        .attr('fill', '#8b949e')
+        .text(yr);
+    }
+  }
+
+  // ── GRIDLINES ──
   for (let yr = 1900; yr <= 2030; yr += 5) {
     const x = (yr - minYear) * pxPerYear;
     const isMajor = yr % 10 === 0;
-    tlG.append('line')
+    contentG.append('line')
       .attr('x1', x).attr('y1', rulerH)
-      .attr('x2', x).attr('y2', 5000)
+      .attr('x2', x).attr('y2', 8000)
       .attr('stroke', isMajor ? '#21262d' : '#161b22')
       .attr('stroke-width', isMajor ? 1.5 : 0.5);
   }
 
-  // ── COLLECT & BIN-PACK ALL BARS ──
+  // ── COLLECT & BIN-PACK ──
   const allBars = nodes.map(n => {
     const span = SPANS[n.id] || [assignEra(n.id), assignEra(n.id) + 5];
     return { node: n, start: span[0], end: span[1] };
@@ -1645,11 +1670,11 @@ function renderPremiere() {
     const x1 = (bar.start - minYear) * pxPerYear;
     const x2 = (bar.end - minYear) * pxPerYear;
     const bw = Math.max(x2 - x1, pxPerYear * 2);
-    const by = rulerH + 10 + bar.lane * (trackH + trackGap);
+    const by = rulerH + 12 + bar.lane * (trackH + trackGap);
     const n = bar.node;
     const fills = solidFills[n.category];
 
-    const barG = tlG.append('g').style('cursor', 'pointer');
+    const barG = contentG.append('g').style('cursor', 'pointer');
 
     // Solid bar
     barG.append('rect')
@@ -1661,25 +1686,25 @@ function renderPremiere() {
     // Left accent
     barG.append('rect')
       .attr('x', x1).attr('y', by)
-      .attr('width', 5).attr('height', trackH)
-      .attr('rx', 2.5)
+      .attr('width', 6).attr('height', trackH)
+      .attr('rx', 3)
       .attr('fill', fills.accent);
 
-    // Clip path for text
+    // Clip
     const clipId = `c${n.id.replace(/[^a-z0-9]/gi, '')}`;
-    tlG.append('clipPath').attr('id', clipId)
+    contentG.append('clipPath').attr('id', clipId)
       .append('rect')
-      .attr('x', x1 + 12).attr('y', by)
-      .attr('width', Math.max(bw - 18, 1)).attr('height', trackH);
+      .attr('x', x1 + 14).attr('y', by)
+      .attr('width', Math.max(bw - 20, 1)).attr('height', trackH);
 
-    // Label — 16px semibold white
+    // Label — 22px normal weight Helvetica white
     barG.append('text')
-      .attr('x', x1 + 16)
-      .attr('y', by + trackH / 2 + 6)
-      .attr('font-family', 'Inter, sans-serif')
-      .attr('font-size', '16px')
-      .attr('font-weight', '600')
-      .attr('fill', fills.text)
+      .attr('x', x1 + 18)
+      .attr('y', by + trackH / 2 + 8)
+      .attr('font-family', 'Helvetica, Arial, sans-serif')
+      .attr('font-size', '22px')
+      .attr('font-weight', '400')
+      .attr('fill', '#ffffff')
       .attr('clip-path', `url(#${clipId})`)
       .text(n.label[currentLang]);
 
@@ -1700,14 +1725,12 @@ function renderPremiere() {
       tooltip.classList.remove('visible');
     });
 
-    // Click → detail panel
     barG.on('click', (event) => {
       event.stopPropagation();
       openPanel(n);
     });
   });
 
-  // Click background to close
   tlSvg.on('click', () => closePanel());
 }
 
