@@ -355,6 +355,164 @@
     color: var(--text-dim);
   }
 
+  /* ─── View toggle ─── */
+  .view-toggle {
+    display: flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .view-btn {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-dim);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .view-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* ─── Timeline ─── */
+  #timeline-container {
+    width: 100%;
+    height: calc(100vh - 48px);
+    position: absolute;
+    top: 48px;
+    left: 0;
+    overflow-x: auto;
+    overflow-y: auto;
+    display: none;
+    background: var(--bg);
+  }
+
+  #timeline-container.active { display: block; }
+  #graph-container.hidden { display: none; }
+
+  .timeline-svg { min-width: 100%; }
+
+  .tl-year-line {
+    stroke: var(--border);
+    stroke-width: 1;
+    stroke-dasharray: 4 4;
+  }
+
+  .tl-year-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 28px;
+    font-weight: 700;
+    fill: rgba(230,237,243,0.08);
+    text-anchor: middle;
+  }
+
+  .tl-era-band {
+    fill: rgba(255,255,255,0.015);
+    rx: 12;
+  }
+
+  .tl-era-band:nth-child(even) {
+    fill: rgba(255,255,255,0.03);
+  }
+
+  .tl-axis {
+    stroke: rgba(139,148,158,0.25);
+    stroke-width: 2;
+  }
+
+  .tl-node {
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .tl-node:hover { opacity: 1 !important; }
+
+  .tl-inflexion-card {
+    cursor: pointer;
+  }
+
+  .tl-inflexion-bg {
+    fill: var(--bg-panel);
+    stroke: var(--border);
+    stroke-width: 1;
+    rx: 10;
+    transition: stroke 0.15s;
+  }
+
+  .tl-inflexion-card:hover .tl-inflexion-bg {
+    stroke: var(--inflexion);
+  }
+
+  .tl-inflexion-year {
+    font-family: 'Inter', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    fill: var(--inflexion);
+  }
+
+  .tl-inflexion-title {
+    font-family: 'Inter', sans-serif;
+    font-size: 12px;
+    font-weight: 600;
+    fill: var(--text);
+  }
+
+  .tl-inflexion-desc {
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    fill: var(--text-dim);
+  }
+
+  .tl-branch-node {
+    cursor: pointer;
+  }
+
+  .tl-branch-label {
+    font-family: 'Inter', sans-serif;
+    font-size: 9px;
+    fill: rgba(230,237,243,0.6);
+    transition: fill 0.15s;
+  }
+
+  .tl-branch-node:hover .tl-branch-label {
+    fill: #fff;
+  }
+
+  .tl-connector {
+    stroke: rgba(139,148,158,0.12);
+    stroke-width: 1;
+    fill: none;
+  }
+
+  .tl-scroll-hint {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-panel-glass);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 8px 20px;
+    font-size: 11px;
+    color: var(--text-muted);
+    z-index: 100;
+    display: none;
+    animation: pulse-hint 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-hint {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
   @media (max-width: 768px) {
     .detail-panel { width: 100%; }
     .search-input { width: 120px; }
@@ -370,6 +528,10 @@
     <span class="node-count" id="node-count"></span>
   </div>
   <div class="top-bar-controls">
+    <div class="view-toggle">
+      <button class="view-btn active" id="btn-graph" onclick="setView('graph')">⬡ Grafo</button>
+      <button class="view-btn" id="btn-timeline" onclick="setView('timeline')">▸ Línea</button>
+    </div>
     <div class="search-container">
       <span class="search-icon">⌕</span>
       <input type="text" class="search-input" id="search" placeholder="Buscar nodo...">
@@ -392,6 +554,8 @@
 </div>
 
 <div id="graph-container"></div>
+<div id="timeline-container"></div>
+<div class="tl-scroll-hint" id="scroll-hint">← Desliza para explorar la línea de tiempo →</div>
 
 <div class="detail-panel" id="detail-panel">
   <button class="close-btn" onclick="closePanel()">×</button>
@@ -1304,6 +1468,320 @@ setTimeout(() => {
   document.getElementById('instructions').style.opacity = '0';
   setTimeout(() => document.getElementById('instructions').style.display = 'none', 600);
 }, 12000);
+
+// ═══════════════════════════════════════════
+// TIMELINE VIEW
+// ═══════════════════════════════════════════
+
+let currentView = 'graph';
+let timelineBuilt = false;
+
+// Year extraction helper
+function extractYear(id) {
+  const m = id.match(/^(\d{4})/);
+  return m ? parseInt(m[1]) : null;
+}
+
+// Assign approximate years to non-inflexion nodes based on their connections
+function assignEra(nodeId) {
+  const connected = [];
+  dedupedLinks.forEach(l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sid === nodeId) { const y = extractYear(tid); if (y) connected.push(y); }
+    if (tid === nodeId) { const y = extractYear(sid); if (y) connected.push(y); }
+  });
+  if (connected.length === 0) return 1950; // default
+  return Math.round(connected.reduce((a,b) => a+b, 0) / connected.length);
+}
+
+function buildTimeline() {
+  if (timelineBuilt) return;
+  timelineBuilt = true;
+
+  const tlContainer = document.getElementById('timeline-container');
+  
+  // Get inflection points sorted by year
+  const inflexions = nodes.filter(n => n.category === 'inflexion')
+    .map(n => ({ ...n, year: extractYear(n.id) }))
+    .filter(n => n.year)
+    .sort((a, b) => a.year - b.year);
+
+  // Group non-inflexion nodes by their nearest era
+  const eraNodes = new Map(); // year -> [nodes]
+  inflexions.forEach(inf => eraNodes.set(inf.year, []));
+  
+  nodes.filter(n => n.category !== 'inflexion').forEach(n => {
+    const era = assignEra(n.id);
+    // Find closest inflexion year
+    let closest = inflexions[0].year;
+    let minDist = Infinity;
+    inflexions.forEach(inf => {
+      const d = Math.abs(inf.year - era);
+      if (d < minDist) { minDist = d; closest = inf.year; }
+    });
+    if (!eraNodes.has(closest)) eraNodes.set(closest, []);
+    eraNodes.get(closest).push(n);
+  });
+
+  // Layout constants
+  const cardW = 220, cardH = 80;
+  const eraSpacing = 320;
+  const marginLeft = 80;
+  const marginTop = 60;
+  const axisY = marginTop + 40;
+  const cardY = axisY + 30;
+  const branchStartY = cardY + cardH + 20;
+  const branchRowH = 22;
+
+  // Calculate max branch depth for height
+  let maxBranches = 0;
+  eraNodes.forEach(arr => { if (arr.length > maxBranches) maxBranches = arr.length; });
+
+  const totalW = marginLeft + inflexions.length * eraSpacing + 100;
+  const totalH = branchStartY + maxBranches * branchRowH + 100;
+
+  // Create SVG
+  const tlSvg = d3.select(tlContainer).append('svg')
+    .attr('class', 'timeline-svg')
+    .attr('width', totalW)
+    .attr('height', Math.max(totalH, window.innerHeight - 48));
+
+  // Background era bands
+  inflexions.forEach((inf, i) => {
+    tlSvg.append('rect')
+      .attr('class', 'tl-era-band')
+      .attr('x', marginLeft + i * eraSpacing - eraSpacing * 0.4)
+      .attr('y', marginTop)
+      .attr('width', eraSpacing * 0.8)
+      .attr('height', totalH - marginTop - 40)
+      .attr('fill', i % 2 === 0 ? 'rgba(255,255,255,0.015)' : 'rgba(255,255,255,0.03)');
+  });
+
+  // Big year labels in background
+  inflexions.forEach((inf, i) => {
+    tlSvg.append('text')
+      .attr('class', 'tl-year-label')
+      .attr('x', marginLeft + i * eraSpacing)
+      .attr('y', axisY - 8)
+      .text(inf.year);
+  });
+
+  // Main axis line
+  tlSvg.append('line')
+    .attr('class', 'tl-axis')
+    .attr('x1', marginLeft - 40)
+    .attr('y1', axisY)
+    .attr('x2', marginLeft + (inflexions.length - 1) * eraSpacing + 40)
+    .attr('y2', axisY);
+
+  // Axis dots at each era
+  inflexions.forEach((inf, i) => {
+    tlSvg.append('circle')
+      .attr('cx', marginLeft + i * eraSpacing)
+      .attr('cy', axisY)
+      .attr('r', 6)
+      .attr('fill', categoryColors.inflexion.fill)
+      .attr('filter', 'url(#glow-inflexion)');
+    
+    // Vertical connector from axis to card
+    tlSvg.append('line')
+      .attr('x1', marginLeft + i * eraSpacing)
+      .attr('y1', axisY + 6)
+      .attr('x2', marginLeft + i * eraSpacing)
+      .attr('y2', cardY)
+      .attr('stroke', 'rgba(248,81,73,0.3)')
+      .attr('stroke-width', 1);
+  });
+
+  // Inflexion cards
+  inflexions.forEach((inf, i) => {
+    const cx = marginLeft + i * eraSpacing;
+    const cardGroup = tlSvg.append('g')
+      .attr('class', 'tl-inflexion-card')
+      .attr('transform', `translate(${cx - cardW/2}, ${cardY})`)
+      .style('cursor', 'pointer')
+      .on('click', () => openPanel(inf));
+
+    cardGroup.append('rect')
+      .attr('class', 'tl-inflexion-bg')
+      .attr('width', cardW)
+      .attr('height', cardH);
+
+    cardGroup.append('text')
+      .attr('class', 'tl-inflexion-year')
+      .attr('x', 12)
+      .attr('y', 20)
+      .text(inf.year);
+
+    // Title with wrapping
+    const titleText = inf.label[currentLang].replace(/^\d{4}\s*·\s*/, '');
+    cardGroup.append('text')
+      .attr('class', 'tl-inflexion-title tl-title-text')
+      .attr('data-id', inf.id)
+      .attr('x', 12)
+      .attr('y', 38)
+      .text(titleText.length > 26 ? titleText.slice(0, 24) + '…' : titleText);
+
+    // Short desc
+    const shortDesc = inf.desc[currentLang].slice(0, 60) + '…';
+    cardGroup.append('text')
+      .attr('class', 'tl-inflexion-desc tl-desc-text')
+      .attr('data-id', inf.id)
+      .attr('x', 12)
+      .attr('y', 56)
+      .text(shortDesc.length > 38 ? shortDesc.slice(0, 36) + '…' : shortDesc);
+
+    // Category dot
+    cardGroup.append('circle')
+      .attr('cx', cardW - 16)
+      .attr('cy', 16)
+      .attr('r', 4)
+      .attr('fill', categoryColors.inflexion.fill)
+      .attr('filter', 'url(#glow-inflexion)');
+  });
+
+  // Branch nodes (people, concepts, scenarios connected to each era)
+  inflexions.forEach((inf, i) => {
+    const cx = marginLeft + i * eraSpacing;
+    const branchNodes = eraNodes.get(inf.year) || [];
+    
+    // Sort by category then name
+    branchNodes.sort((a, b) => {
+      const catOrder = { persona: 0, concepto: 1, escenario: 2 };
+      const ca = catOrder[a.category] ?? 3;
+      const cb = catOrder[b.category] ?? 3;
+      if (ca !== cb) return ca - cb;
+      return a.label[currentLang].localeCompare(b.label[currentLang]);
+    });
+
+    branchNodes.forEach((bn, j) => {
+      const by = branchStartY + j * branchRowH;
+      
+      // Connector line
+      tlSvg.append('line')
+        .attr('class', 'tl-connector')
+        .attr('x1', cx)
+        .attr('y1', cardY + cardH)
+        .attr('x2', cx)
+        .attr('y2', by + 4);
+
+      const branchGroup = tlSvg.append('g')
+        .attr('class', 'tl-branch-node')
+        .attr('transform', `translate(${cx}, ${by})`)
+        .style('cursor', 'pointer')
+        .on('click', () => openPanel(bn));
+
+      branchGroup.append('circle')
+        .attr('cx', 0)
+        .attr('cy', 4)
+        .attr('r', 3.5)
+        .attr('fill', categoryColors[bn.category].fill)
+        .attr('filter', `url(#glow-${bn.category})`);
+
+      branchGroup.append('text')
+        .attr('class', 'tl-branch-label tl-bl-text')
+        .attr('data-id', bn.id)
+        .attr('x', 8)
+        .attr('y', 7)
+        .text(bn.label[currentLang]);
+    });
+  });
+
+  // Connection arcs between inflexion points
+  dedupedLinks.forEach(l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    const sIdx = inflexions.findIndex(inf => inf.id === sid);
+    const tIdx = inflexions.findIndex(inf => inf.id === tid);
+    if (sIdx >= 0 && tIdx >= 0 && sIdx !== tIdx) {
+      const x1 = marginLeft + sIdx * eraSpacing;
+      const x2 = marginLeft + tIdx * eraSpacing;
+      const midX = (x1 + x2) / 2;
+      const arcH = -20 - Math.abs(tIdx - sIdx) * 5;
+      tlSvg.append('path')
+        .attr('d', `M ${x1} ${axisY} Q ${midX} ${axisY + arcH} ${x2} ${axisY}`)
+        .attr('fill', 'none')
+        .attr('stroke', 'rgba(248,81,73,0.08)')
+        .attr('stroke-width', 1);
+    }
+  });
+}
+
+function rebuildTimelineLabels() {
+  // Update inflexion titles and descriptions
+  d3.selectAll('.tl-title-text').each(function() {
+    const id = d3.select(this).attr('data-id');
+    const n = nodeMap.get(id);
+    if (n) {
+      const titleText = n.label[currentLang].replace(/^\d{4}\s*·\s*/, '');
+      d3.select(this).text(titleText.length > 26 ? titleText.slice(0, 24) + '…' : titleText);
+    }
+  });
+  d3.selectAll('.tl-desc-text').each(function() {
+    const id = d3.select(this).attr('data-id');
+    const n = nodeMap.get(id);
+    if (n) {
+      const shortDesc = n.desc[currentLang].slice(0, 60) + '…';
+      d3.select(this).text(shortDesc.length > 38 ? shortDesc.slice(0, 36) + '…' : shortDesc);
+    }
+  });
+  // Update branch labels
+  d3.selectAll('.tl-bl-text').each(function() {
+    const id = d3.select(this).attr('data-id');
+    const n = nodeMap.get(id);
+    if (n) d3.select(this).text(n.label[currentLang]);
+  });
+}
+
+// ── View toggle ──
+window.setView = function(view) {
+  currentView = view;
+  document.getElementById('btn-graph').classList.toggle('active', view === 'graph');
+  document.getElementById('btn-timeline').classList.toggle('active', view === 'timeline');
+
+  const graphEl = document.getElementById('graph-container');
+  const tlEl = document.getElementById('timeline-container');
+  const legendEl = document.getElementById('legend');
+  const instrEl = document.getElementById('instructions');
+  const scrollHint = document.getElementById('scroll-hint');
+
+  if (view === 'graph') {
+    graphEl.classList.remove('hidden');
+    tlEl.classList.remove('active');
+    legendEl.style.display = '';
+    scrollHint.style.display = 'none';
+    simulation.alpha(0.1).restart();
+  } else {
+    graphEl.classList.add('hidden');
+    tlEl.classList.add('active');
+    legendEl.style.display = 'none';
+    if (instrEl) instrEl.style.display = 'none';
+    scrollHint.style.display = 'block';
+    buildTimeline();
+    // Auto-hide scroll hint
+    setTimeout(() => { scrollHint.style.display = 'none'; }, 5000);
+  }
+
+  // Update button labels for language
+  document.getElementById('btn-graph').textContent = currentLang === 'es' ? '⬡ Grafo' : '⬡ Graph';
+  document.getElementById('btn-timeline').textContent = currentLang === 'es' ? '▸ Línea' : '▸ Timeline';
+};
+
+// Patch setLang to also update timeline and view toggle labels
+const origSetLang = window.setLang;
+window.setLang = function(lang) {
+  origSetLang(lang);
+  // Update view toggle labels
+  document.getElementById('btn-graph').textContent = lang === 'es' ? '⬡ Grafo' : '⬡ Graph';
+  document.getElementById('btn-timeline').textContent = lang === 'es' ? '▸ Línea' : '▸ Timeline';
+  // Update scroll hint
+  document.getElementById('scroll-hint').textContent = lang === 'es' 
+    ? '← Desliza para explorar la línea de tiempo →' 
+    : '← Scroll to explore the timeline →';
+  // Update timeline labels if built
+  if (timelineBuilt) rebuildTimelineLabels();
+};
 </script>
 </body>
 </html>
