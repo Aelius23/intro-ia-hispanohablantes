@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Genealogía de la IA · Grafo Interactivo</title>
+<meta name="description" content="Grafo interactivo sobre la genealogía de la inteligencia artificial: personas, conceptos, escenarios y puntos de inflexión.">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --bg-panel: #161b22;
+    --bg-panel-glass: rgba(22, 27, 34, 0.92);
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --text-muted: #484f58;
+    --inflexion: #f85149;
+    --inflexion-glow: rgba(248, 81, 73, 0.4);
+    --concepto: #58a6ff;
+    --concepto-glow: rgba(88, 166, 255, 0.4);
+    --persona: #3fb950;
+    --persona-glow: rgba(63, 185, 80, 0.4);
+    --escenario: #d29922;
+    --escenario-glow: rgba(210, 153, 34, 0.4);
+    --link-color: rgba(139, 148, 158, 0.18);
+    --link-hover: rgba(139, 148, 158, 0.55);
+    --accent: #7c3aed;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  #graph-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0; left: 0;
+  }
+
+  svg { width: 100%; height: 100%; }
+
+  /* ─── Top bar ─── */
+  .top-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 48px;
+    background: var(--bg-panel-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 100;
+  }
+
+  .top-bar h1 {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  .top-bar-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lang-toggle {
+    display: flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .lang-btn {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-dim);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .lang-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .node-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+  }
+
+  /* ─── Legend ─── */
+  .legend {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: var(--bg-panel-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .legend-item:hover { opacity: 0.8; }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ─── Detail Panel ─── */
+  .detail-panel {
+    position: fixed;
+    top: 48px;
+    right: 0;
+    width: 380px;
+    height: calc(100vh - 48px);
+    background: var(--bg-panel-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid var(--border);
+    z-index: 99;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    padding: 24px;
+  }
+
+  .detail-panel.open { transform: translateX(0); }
+
+  .detail-panel .close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-dim);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .detail-panel .close-btn:hover {
+    background: var(--border);
+    color: var(--text);
+  }
+
+  .detail-category {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+
+  .detail-category.inflexion { background: var(--inflexion); color: #fff; }
+  .detail-category.concepto { background: var(--concepto); color: #0d1117; }
+  .detail-category.persona { background: var(--persona); color: #0d1117; }
+  .detail-category.escenario { background: var(--escenario); color: #0d1117; }
+
+  .detail-title {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .detail-description {
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+  }
+
+  .detail-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .detail-connections {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .detail-conn-chip {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .detail-conn-chip:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  .detail-sources {
+    list-style: none;
+  }
+
+  .detail-sources li {
+    margin-bottom: 6px;
+  }
+
+  .detail-sources a {
+    font-size: 11px;
+    color: var(--concepto);
+    text-decoration: none;
+    word-break: break-all;
+    transition: color 0.15s;
+  }
+
+  .detail-sources a:hover {
+    color: var(--text);
+    text-decoration: underline;
+  }
+
+  /* ─── Search ─── */
+  .search-container {
+    position: relative;
+  }
+
+  .search-input {
+    width: 200px;
+    padding: 5px 12px 5px 28px;
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .search-input::placeholder { color: var(--text-muted); }
+  .search-input:focus { border-color: var(--accent); }
+
+  .search-icon {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 12px;
+    pointer-events: none;
+  }
+
+  /* ─── Tooltip ─── */
+  .tooltip {
+    position: fixed;
+    padding: 6px 12px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 200;
+    max-width: 260px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tooltip.visible { opacity: 1; }
+
+  /* ─── Instructions ─── */
+  .instructions {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--bg-panel-glass);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    z-index: 100;
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 220px;
+    transition: opacity 0.5s;
+  }
+
+  .instructions kbd {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  @media (max-width: 768px) {
+    .detail-panel { width: 100%; }
+    .search-input { width: 120px; }
+    .instructions { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <h1 id="main-title">Genealogía de la IA</h1>
+    <span class="node-count" id="node-count"></span>
+  </div>
+  <div class="top-bar-controls">
+    <div class="search-container">
+      <span class="search-icon">⌕</span>
+      <input type="text" class="search-input" id="search" placeholder="Buscar nodo...">
+    </div>
+    <div class="lang-toggle">
+      <button class="lang-btn active" id="btn-es" onclick="setLang('es')">ES</button>
+      <button class="lang-btn" id="btn-en" onclick="setLang('en')">EN</button>
+    </div>
+  </div>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div class="instructions" id="instructions">
+  <strong id="instr-title">Navegación</strong><br>
+  <span id="instr-drag">Arrastrar</span>: mover nodos<br>
+  <span id="instr-scroll">Scroll</span>: zoom<br>
+  <span id="instr-click">Clic</span>: ver ficha<br>
+  <span id="instr-hover">Hover</span>: resaltar conexiones
+</div>
+
+<div id="graph-container"></div>
+
+<div class="detail-panel" id="detail-panel">
+  <button class="close-btn" onclick="closePanel()">×</button>
+  <div id="detail-content"></div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// ═══════════════════════════════════════════
+// DATA — All 65 nodes from Sandra's vault
+// ═══════════════════════════════════════════
+
+const NODES = [
+  // ── PUNTOS DE INFLEXIÓN ──
+  { id: "1913-markov-cadenas-texto", category: "inflexion",
+    label: { es: "1913 · Markov y el texto", en: "1913 · Markov & text" },
+    desc: {
+      es: "En 1913, Andrey Markov aplicó su trabajo sobre procesos probabilísticos al análisis de Eugene Onegin, de Alexander Pushkin. Tomó una secuencia de miles de letras del poema y las clasificó como vocales o consonantes para estudiar si la aparición de cada elemento era independiente o dependía de lo que venía antes. El resultado mostró que incluso una secuencia escrita podía analizarse como una cadena con regularidades estadísticas.",
+      en: "In 1913, Andrey Markov applied his work on probabilistic processes to analyze Eugene Onegin by Alexander Pushkin. He took a sequence of thousands of letters from the poem and classified them as vowels or consonants to study whether each element's appearance was independent or depended on what came before. The result showed that even a written sequence could be analyzed as a chain with statistical regularities."
+    }},
+  { id: "1943-neurona-logica-mcculloch-pitts", category: "inflexion",
+    label: { es: "1943 · Neurona lógica", en: "1943 · Logical neuron" },
+    desc: {
+      es: "En 1943, McCulloch y Pitts publicaron un modelo formal de neurona artificial capaz de recibir entradas, aplicar una regla lógica y producir una salida binaria. Unieron fisiología, lógica matemática y computación antes de que la inteligencia artificial existiera como campo.",
+      en: "In 1943, McCulloch and Pitts published a formal model of an artificial neuron capable of receiving inputs, applying a logical rule, and producing a binary output. They united physiology, mathematical logic, and computation before AI existed as a field."
+    }},
+  { id: "1948-cibernetica-wiener", category: "inflexion",
+    label: { es: "1948 · Cibernética de Wiener", en: "1948 · Wiener's Cybernetics" },
+    desc: {
+      es: "En 1948, Norbert Wiener publicó Cybernetics, formulando un campo dedicado al estudio del control y la comunicación en animales, máquinas y sistemas organizados. Combinaba matemáticas, ingeniería, fisiología y problemas técnicos de la Segunda Guerra Mundial.",
+      en: "In 1948, Norbert Wiener published Cybernetics, establishing a field dedicated to studying control and communication in animals, machines, and organized systems. It combined mathematics, engineering, physiology, and WWII-era technical problems."
+    }},
+  { id: "1948-teoria-informacion-shannon", category: "inflexion",
+    label: { es: "1948 · Teoría de la información", en: "1948 · Information theory" },
+    desc: {
+      es: "En 1948, Claude Shannon publicó A Mathematical Theory of Communication, formulando una teoría matemática para estudiar cómo se produce, codifica, transmite y recibe información a través de un canal. Permitió pensar la información como magnitud medible y el lenguaje como fuente de señales con regularidades estadísticas.",
+      en: "In 1948, Claude Shannon published A Mathematical Theory of Communication, formulating a mathematical theory for studying how information is produced, encoded, transmitted, and received through a channel. It enabled thinking of information as a measurable quantity and language as a source of signals with statistical regularities."
+    }},
+  { id: "1956-dartmouth-artificial-intelligence", category: "inflexion",
+    label: { es: "1956 · Dartmouth: nace la IA", en: "1956 · Dartmouth: AI is born" },
+    desc: {
+      es: "En 1956 se realizó en Dartmouth College la reunión que agrupó líneas previas bajo una nueva denominación: inteligencia artificial. Organizada por McCarthy, Minsky, Rochester y Shannon, no marca el inicio absoluto de las máquinas, pero sí la institucionalización de un campo con nombre propio.",
+      en: "In 1956, a meeting at Dartmouth College grouped previous research lines under a new name: artificial intelligence. Organized by McCarthy, Minsky, Rochester, and Shannon, it marks not the absolute beginning of machines, but the institutionalization of a field with its own name."
+    }},
+  { id: "1968-gmdh-ivakhnenko-lapa", category: "inflexion",
+    label: { es: "1968 · GMDH", en: "1968 · GMDH" },
+    desc: {
+      es: "En 1968, Alexey Ivakhnenko desarrolló el GMDH (Group Method of Data Handling) en el Instituto de Cibernética de Kyiv. Proponía una forma inductiva de modelar sistemas complejos: partir de datos, generar modelos posibles, evaluarlos y seleccionar estructuras según su desempeño.",
+      en: "In 1968, Alexey Ivakhnenko developed GMDH (Group Method of Data Handling) at the Kyiv Institute of Cybernetics. It proposed an inductive way to model complex systems: starting from data, generating possible models, evaluating them, and selecting structures based on performance."
+    }},
+  { id: "1986-backpropagation", category: "inflexion",
+    label: { es: "1986 · Backpropagation", en: "1986 · Backpropagation" },
+    desc: {
+      es: "En 1986, Rumelhart, Hinton y Williams publicaron un procedimiento de aprendizaje para redes de unidades similares a neuronas, donde los pesos se ajustan para reducir la diferencia entre la salida producida y la esperada. Hizo entrenables redes con capas ocultas.",
+      en: "In 1986, Rumelhart, Hinton, and Williams published a learning procedure for networks of neuron-like units, where weights are adjusted to reduce the difference between produced and expected output. It made networks with hidden layers trainable."
+    }},
+  { id: "2012-alexnet-imagenet-gpu", category: "inflexion",
+    label: { es: "2012 · AlexNet e ImageNet", en: "2012 · AlexNet & ImageNet" },
+    desc: {
+      es: "En 2012, AlexNet usó una red neuronal convolucional profunda entrenada sobre millones de imágenes de ImageNet con aceleración GPU. Demostró que la combinación de grandes datasets, arquitecturas profundas y cómputo paralelo podía superar métodos basados en rasgos diseñados manualmente.",
+      en: "In 2012, AlexNet used a deep convolutional neural network trained on millions of ImageNet images with GPU acceleration. It demonstrated that combining large datasets, deep architectures, and parallel computing could surpass methods based on manually designed features."
+    }},
+  { id: "2014-seq2seq-attention", category: "inflexion",
+    label: { es: "2014 · Seq2Seq y atención", en: "2014 · Seq2Seq & attention" },
+    desc: {
+      es: "En 2014, varios trabajos consolidaron la traducción automática neuronal basada en arquitecturas secuencia-a-secuencia. El mecanismo de atención permitió al decodificador enfocarse en distintas partes de la oración fuente durante la generación.",
+      en: "In 2014, several works consolidated neural machine translation based on sequence-to-sequence architectures. The attention mechanism allowed the decoder to focus on different parts of the source sentence during generation."
+    }},
+  { id: "2017-transformer-attention-is-all-you-need", category: "inflexion",
+    label: { es: "2017 · Transformer", en: "2017 · Transformer" },
+    desc: {
+      es: "En 2017, Vaswani et al. publicaron Attention Is All You Need, presentando el Transformer: una arquitectura basada en mecanismos de atención que desplazó a las redes recurrentes y convolucionales en procesamiento de lenguaje. Umbral técnico hacia GPT, BERT y ChatGPT.",
+      en: "In 2017, Vaswani et al. published Attention Is All You Need, presenting the Transformer: an architecture based on attention mechanisms that displaced recurrent and convolutional networks in language processing. Technical threshold toward GPT, BERT, and ChatGPT."
+    }},
+  { id: "2018-bert-bidirectional-transformers", category: "inflexion",
+    label: { es: "2018 · BERT", en: "2018 · BERT" },
+    desc: {
+      es: "En 2018, BERT usó la arquitectura Transformer para preentrenar representaciones lingüísticas bidireccionales. Consolidó el preentrenamiento sobre grandes corpus como base reutilizable para múltiples tareas de comprensión lingüística.",
+      en: "In 2018, BERT used the Transformer architecture to pretrain bidirectional linguistic representations. It consolidated pretraining on large corpora as a reusable base for multiple language understanding tasks."
+    }},
+  { id: "2018-gpt1-generative-pretraining", category: "inflexion",
+    label: { es: "2018 · GPT-1", en: "2018 · GPT-1" },
+    desc: {
+      es: "En 2018, OpenAI presentó GPT-1, un modelo Transformer entrenado primero con predicción de la siguiente palabra y luego ajustado para tareas específicas. Consolidó el preentrenamiento generativo como ruta práctica para modelos de lenguaje reutilizables.",
+      en: "In 2018, OpenAI presented GPT-1, a Transformer model first trained with next-word prediction and then fine-tuned for specific tasks. It consolidated generative pretraining as a practical path for reusable language models."
+    }},
+  { id: "2020-gpt3-few-shot-learning", category: "inflexion",
+    label: { es: "2020 · GPT-3", en: "2020 · GPT-3" },
+    desc: {
+      es: "En 2020, GPT-3 mostró que un modelo con 175 mil millones de parámetros podía resolver tareas a partir de instrucciones y ejemplos en el prompt, sin fine-tuning específico. Preparó el paso hacia ChatGPT y la capa de producto.",
+      en: "In 2020, GPT-3 showed that a model with 175 billion parameters could solve tasks from instructions and examples in the prompt, without specific fine-tuning. It prepared the path toward ChatGPT and the product layer."
+    }},
+  { id: "2022-anthropic-constitutional-ai", category: "inflexion",
+    label: { es: "2022 · Constitutional AI", en: "2022 · Constitutional AI" },
+    desc: {
+      es: "En 2022, Anthropic publicó Constitutional AI, un método para entrenar asistentes usando principios explícitos como guía de comportamiento. Introdujo una forma importante de entrenar y gobernar asistentes públicos mediante alineamiento explícito.",
+      en: "In 2022, Anthropic published Constitutional AI, a method for training assistants using explicit principles as behavioral guides. It introduced an important way to train and govern public assistants through explicit alignment."
+    }},
+  { id: "2022-chatgpt-product-layer", category: "inflexion",
+    label: { es: "2022 · ChatGPT", en: "2022 · ChatGPT" },
+    desc: {
+      es: "En noviembre de 2022, OpenAI lanzó ChatGPT como interfaz conversacional basada en GPT-3.5. Convirtió una línea técnica previa en una experiencia pública, accesible y dialogada. La novedad no estaba solo en el modelo, sino en la forma de interacción.",
+      en: "In November 2022, OpenAI launched ChatGPT as a conversational interface based on GPT-3.5. It turned a previous technical line into a public, accessible, dialogue-based experience. The novelty was not just the model, but the form of interaction."
+    }},
+
+  // ── PERSONAS ──
+  { id: "andrey-markov", category: "persona",
+    label: { es: "Andrey Markov", en: "Andrey Markov" },
+    desc: {
+      es: "Matemático ruso que desarrolló la teoría de procesos estocásticos y cadenas de Markov, aplicándola al análisis de secuencias de texto.",
+      en: "Russian mathematician who developed the theory of stochastic processes and Markov chains, applying it to the analysis of text sequences."
+    }},
+  { id: "mcculloch-pitts", category: "persona",
+    label: { es: "McCulloch y Pitts", en: "McCulloch & Pitts" },
+    desc: {
+      es: "Warren McCulloch y Walter Pitts propusieron en 1943 el primer modelo formal de neurona artificial, uniendo fisiología, lógica matemática y computación.",
+      en: "Warren McCulloch and Walter Pitts proposed in 1943 the first formal model of an artificial neuron, uniting physiology, mathematical logic, and computation."
+    }},
+  { id: "norbert-wiener", category: "persona",
+    label: { es: "Norbert Wiener", en: "Norbert Wiener" },
+    desc: {
+      es: "Matemático e ingeniero que formuló la cibernética como campo interdisciplinario dedicado al control y la comunicación en animales, máquinas y sistemas organizados.",
+      en: "Mathematician and engineer who formulated cybernetics as an interdisciplinary field dedicated to control and communication in animals, machines, and organized systems."
+    }},
+  { id: "claude-shannon", category: "persona",
+    label: { es: "Claude Shannon", en: "Claude Shannon" },
+    desc: {
+      es: "Matemático e ingeniero que publicó la teoría matemática de la comunicación en 1948, creando el campo de la teoría de la información.",
+      en: "Mathematician and engineer who published the mathematical theory of communication in 1948, creating the field of information theory."
+    }},
+  { id: "john-mccarthy", category: "persona",
+    label: { es: "John McCarthy", en: "John McCarthy" },
+    desc: {
+      es: "Científico de la computación que acuñó el término 'inteligencia artificial' y organizó la conferencia de Dartmouth de 1956.",
+      en: "Computer scientist who coined the term 'artificial intelligence' and organized the 1956 Dartmouth conference."
+    }},
+  { id: "marvin-minsky", category: "persona",
+    label: { es: "Marvin Minsky", en: "Marvin Minsky" },
+    desc: {
+      es: "Científico cognitivo y cofundador del MIT AI Lab, figura central en la inteligencia artificial simbólica y co-organizador de Dartmouth.",
+      en: "Cognitive scientist and co-founder of the MIT AI Lab, central figure in symbolic AI and co-organizer of Dartmouth."
+    }},
+  { id: "nathaniel-rochester", category: "persona",
+    label: { es: "Nathaniel Rochester", en: "Nathaniel Rochester" },
+    desc: {
+      es: "Ingeniero de IBM y co-organizador de Dartmouth. Trabajó en simulación de redes neuronales en computadoras de IBM en la década de 1950.",
+      en: "IBM engineer and Dartmouth co-organizer. Worked on neural network simulation on IBM computers in the 1950s."
+    }},
+  { id: "frank-rosenblatt", category: "persona",
+    label: { es: "Frank Rosenblatt", en: "Frank Rosenblatt" },
+    desc: {
+      es: "Psicólogo e ingeniero que desarrolló el perceptrón, uno de los primeros modelos de aprendizaje en redes neuronales.",
+      en: "Psychologist and engineer who developed the perceptron, one of the first learning models in neural networks."
+    }},
+  { id: "ivakhnenko-lapa", category: "persona",
+    label: { es: "Ivakhnenko y Lapa", en: "Ivakhnenko & Lapa" },
+    desc: {
+      es: "Alexey Ivakhnenko y Valentin Lapa desarrollaron el GMDH en el Instituto de Cibernética de Kyiv, pioneros del modelamiento inductivo y redes profundas tempranas.",
+      en: "Alexey Ivakhnenko and Valentin Lapa developed GMDH at the Kyiv Institute of Cybernetics, pioneers of inductive modeling and early deep networks."
+    }},
+  { id: "krizhevsky-sutskever-hinton", category: "persona",
+    label: { es: "Krizhevsky, Sutskever, Hinton", en: "Krizhevsky, Sutskever, Hinton" },
+    desc: {
+      es: "Equipo que presentó AlexNet en 2012, demostrando la viabilidad de las redes neuronales profundas con GPU para visión computacional a gran escala.",
+      en: "Team that presented AlexNet in 2012, demonstrating the viability of deep neural networks with GPUs for large-scale computer vision."
+    }},
+  { id: "bahdanau-cho-bengio", category: "persona",
+    label: { es: "Bahdanau, Cho, Bengio", en: "Bahdanau, Cho, Bengio" },
+    desc: {
+      es: "Investigadores que incorporaron el mecanismo de atención en la traducción automática neuronal en 2014, preparando el terreno para el Transformer.",
+      en: "Researchers who incorporated the attention mechanism into neural machine translation in 2014, preparing the ground for the Transformer."
+    }},
+  { id: "vaswani-et-al", category: "persona",
+    label: { es: "Vaswani et al.", en: "Vaswani et al." },
+    desc: {
+      es: "Equipo de Google Research que publicó Attention Is All You Need en 2017, introduciendo la arquitectura Transformer.",
+      en: "Google Research team that published Attention Is All You Need in 2017, introducing the Transformer architecture."
+    }},
+  { id: "viktor-glushkov", category: "persona",
+    label: { es: "Viktor Glushkov", en: "Viktor Glushkov" },
+    desc: {
+      es: "Matemático e ingeniero que dirigió el Instituto de Cibernética de Kiev y promovió la cibernética, la computación y la automatización en la URSS.",
+      en: "Mathematician and engineer who directed the Kiev Institute of Cybernetics and promoted cybernetics, computing, and automation in the USSR."
+    }},
+
+  // ── CONCEPTOS ──
+  { id: "probabilidad-condicional", category: "concepto",
+    label: { es: "Probabilidad condicional", en: "Conditional probability" },
+    desc: {
+      es: "Probabilidad de que ocurra un evento dado que ya ocurrió otro. En lenguaje, permite estimar la probabilidad de una continuación a partir de un contexto previo.",
+      en: "Probability that an event occurs given another has already occurred. In language, it allows estimating the probability of a continuation from a prior context."
+    }},
+  { id: "modelos-estadisticos-de-lenguaje", category: "concepto",
+    label: { es: "Modelos estadísticos de lenguaje", en: "Statistical language models" },
+    desc: {
+      es: "Modelos que asignan probabilidades a secuencias de palabras o tokens, tratando el lenguaje como una estructura con regularidades estadísticas observables.",
+      en: "Models that assign probabilities to sequences of words or tokens, treating language as a structure with observable statistical regularities."
+    }},
+  { id: "n-gramas", category: "concepto",
+    label: { es: "N-gramas", en: "N-grams" },
+    desc: {
+      es: "Secuencias contiguas de N elementos usadas para modelar la probabilidad de una continuación dado un contexto fijo de palabras previas.",
+      en: "Contiguous sequences of N elements used to model the probability of a continuation given a fixed context of previous words."
+    }},
+  { id: "cibernetica", category: "concepto",
+    label: { es: "Cibernética", en: "Cybernetics" },
+    desc: {
+      es: "Campo interdisciplinario dedicado al estudio del control, la comunicación y la regulación en máquinas, organismos y sistemas organizados.",
+      en: "Interdisciplinary field dedicated to studying control, communication, and regulation in machines, organisms, and organized systems."
+    }},
+  { id: "control-automatico", category: "concepto",
+    label: { es: "Control automático", en: "Automatic control" },
+    desc: {
+      es: "Campo técnico dedicado a diseñar sistemas capaces de regular su propio comportamiento sin intervención humana continua.",
+      en: "Technical field dedicated to designing systems capable of regulating their own behavior without continuous human intervention."
+    }},
+  { id: "retroalimentacion-feedback", category: "concepto",
+    label: { es: "Retroalimentación", en: "Feedback" },
+    desc: {
+      es: "Proceso por el cual la salida de un sistema regresa como entrada, permitiendo ajuste, corrección y adaptación del comportamiento.",
+      en: "Process by which a system's output returns as input, enabling adjustment, correction, and adaptation of behavior."
+    }},
+  { id: "sistemas-adaptativos", category: "concepto",
+    label: { es: "Sistemas adaptativos", en: "Adaptive systems" },
+    desc: {
+      es: "Sistemas que modifican su comportamiento en respuesta a cambios en su entorno, usando retroalimentación y mecanismos de ajuste.",
+      en: "Systems that modify their behavior in response to environmental changes, using feedback and adjustment mechanisms."
+    }},
+  { id: "teoria-de-automatas", category: "concepto",
+    label: { es: "Teoría de autómatas", en: "Automata theory" },
+    desc: {
+      es: "Marco matemático para estudiar máquinas abstractas y los problemas computacionales que pueden resolver, conectando lógica, computación y lenguajes formales.",
+      en: "Mathematical framework for studying abstract machines and the computational problems they can solve, connecting logic, computation, and formal languages."
+    }},
+  { id: "redes-neuronales-tempranas", category: "concepto",
+    label: { es: "Redes neuronales tempranas", en: "Early neural networks" },
+    desc: {
+      es: "Primeros modelos computacionales inspirados en la estructura del sistema nervioso, incluyendo la neurona de McCulloch-Pitts y el perceptrón de Rosenblatt.",
+      en: "First computational models inspired by the structure of the nervous system, including McCulloch-Pitts' neuron and Rosenblatt's perceptron."
+    }},
+  { id: "simbolico-vs-conexionista", category: "concepto",
+    label: { es: "Simbólico vs conexionista", en: "Symbolic vs connectionist" },
+    desc: {
+      es: "Tensión entre enfoques de IA basados en reglas lógicas y manipulación simbólica, versus los basados en redes de unidades conectadas que aprenden desde datos.",
+      en: "Tension between AI approaches based on logical rules and symbolic manipulation, versus those based on networks of connected units that learn from data."
+    }},
+  { id: "ai-winter", category: "concepto",
+    label: { es: "Invierno de la IA", en: "AI winter" },
+    desc: {
+      es: "Períodos de reducción de financiamiento, interés institucional y expectativas públicas hacia la inteligencia artificial, asociados a promesas difíciles de cumplir.",
+      en: "Periods of reduced funding, institutional interest, and public expectations toward AI, associated with hard-to-fulfill promises."
+    }},
+  { id: "modelamiento-inductivo", category: "concepto",
+    label: { es: "Modelamiento inductivo", en: "Inductive modeling" },
+    desc: {
+      es: "Forma de construir modelos a partir de datos observados, buscando patrones y estructuras sin definir de antemano toda la forma del sistema.",
+      en: "Way of building models from observed data, seeking patterns and structures without predefining the entire system form."
+    }},
+  { id: "aprendizaje-automatico", category: "concepto",
+    label: { es: "Aprendizaje automático", en: "Machine learning" },
+    desc: {
+      es: "Rama de la IA dedicada a construir sistemas que mejoran su desempeño a partir de datos y experiencia, ajustando parámetros y detectando patrones.",
+      en: "Branch of AI dedicated to building systems that improve their performance from data and experience, adjusting parameters and detecting patterns."
+    }},
+  { id: "aprendizaje-de-representaciones", category: "concepto",
+    label: { es: "Aprendizaje de representaciones", en: "Representation learning" },
+    desc: {
+      es: "Línea del aprendizaje automático dedicada a entrenar modelos que construyen internamente formas útiles de representar los datos.",
+      en: "Branch of machine learning dedicated to training models that internally construct useful ways of representing data."
+    }},
+  { id: "deep-learning", category: "concepto",
+    label: { es: "Deep learning", en: "Deep learning" },
+    desc: {
+      es: "Rama del aprendizaje automático basada en redes neuronales con múltiples capas que permiten aprender representaciones jerárquicas desde grandes volúmenes de datos.",
+      en: "Branch of machine learning based on neural networks with multiple layers that enable learning hierarchical representations from large volumes of data."
+    }},
+  { id: "gpu-computing", category: "concepto",
+    label: { es: "GPU computing", en: "GPU computing" },
+    desc: {
+      es: "Uso de unidades de procesamiento gráfico para cómputo paralelo masivo, clave para entrenar redes profundas a escala moderna.",
+      en: "Use of graphics processing units for massive parallel computing, key to training deep networks at modern scale."
+    }},
+  { id: "imagenet", category: "concepto",
+    label: { es: "ImageNet", en: "ImageNet" },
+    desc: {
+      es: "Base de datos visual con millones de imágenes etiquetadas que permitió entrenar y evaluar sistemas de visión computacional a gran escala.",
+      en: "Visual database with millions of labeled images that enabled training and evaluating computer vision systems at large scale."
+    }},
+  { id: "redes-neuronales-convolucionales", category: "concepto",
+    label: { es: "Redes convolucionales", en: "Convolutional networks" },
+    desc: {
+      es: "Arquitecturas neuronales especializadas en detectar patrones espaciales mediante filtros convolucionales, usadas principalmente en visión computacional.",
+      en: "Neural architectures specialized in detecting spatial patterns through convolutional filters, mainly used in computer vision."
+    }},
+  { id: "neural-machine-translation", category: "concepto",
+    label: { es: "Traducción automática neuronal", en: "Neural machine translation" },
+    desc: {
+      es: "Línea de procesamiento de lenguaje natural que usa redes neuronales para traducir texto entre idiomas, aprendiendo representaciones internas de frases.",
+      en: "NLP line that uses neural networks to translate text between languages, learning internal representations of sentences."
+    }},
+  { id: "procesamiento-de-lenguaje-natural", category: "concepto",
+    label: { es: "Procesamiento de lenguaje natural", en: "Natural language processing" },
+    desc: {
+      es: "Campo dedicado a construir sistemas capaces de analizar, interpretar y generar lenguaje humano.",
+      en: "Field dedicated to building systems capable of analyzing, interpreting, and generating human language."
+    }},
+  { id: "reconocimiento-de-habla", category: "concepto",
+    label: { es: "Reconocimiento de habla", en: "Speech recognition" },
+    desc: {
+      es: "Tecnología que convierte señales de audio del habla humana en texto, usando modelos estadísticos y redes neuronales.",
+      en: "Technology that converts human speech audio signals into text, using statistical models and neural networks."
+    }},
+  { id: "ruido-redundancia-codificacion", category: "concepto",
+    label: { es: "Ruido, redundancia y codificación", en: "Noise, redundancy & encoding" },
+    desc: {
+      es: "Conceptos de la teoría de la información que permiten pensar la transmisión de señales considerando errores, redundancia y capacidad del canal.",
+      en: "Information theory concepts that enable thinking about signal transmission considering errors, redundancy, and channel capacity."
+    }},
+  { id: "base-model-product-layer", category: "concepto",
+    label: { es: "Modelo base vs capa de producto", en: "Base model vs product layer" },
+    desc: {
+      es: "Distinción entre el modelo de lenguaje preentrenado y la capa de producto que lo integra con instrucciones, alineamiento, interfaz y herramientas.",
+      en: "Distinction between the pretrained language model and the product layer that integrates it with instructions, alignment, interface, and tools."
+    }},
+  { id: "prompting-as-specification", category: "concepto",
+    label: { es: "Prompting como especificación", en: "Prompting as specification" },
+    desc: {
+      es: "Práctica de usar instrucciones, contexto y restricciones para definir el comportamiento esperado de un modelo de lenguaje.",
+      en: "Practice of using instructions, context, and constraints to define the expected behavior of a language model."
+    }},
+  { id: "verification-as-practice", category: "concepto",
+    label: { es: "Verificación como práctica", en: "Verification as practice" },
+    desc: {
+      es: "Hábito de verificar resultados de IA antes de actuar, especialmente cuando el costo de equivocarse es alto.",
+      en: "Habit of verifying AI results before acting, especially when the cost of being wrong is high."
+    }},
+  { id: "rlhf-human-feedback", category: "concepto",
+    label: { es: "RLHF · feedback humano", en: "RLHF · human feedback" },
+    desc: {
+      es: "Aprendizaje por refuerzo desde retroalimentación humana, usado para alinear modelos de lenguaje con preferencias de usuarios y criterios de calidad.",
+      en: "Reinforcement learning from human feedback, used to align language models with user preferences and quality criteria."
+    }},
+  { id: "anthropic-ai-safety-alignment", category: "concepto",
+    label: { es: "AI safety y alignment", en: "AI safety & alignment" },
+    desc: {
+      es: "Línea de investigación de Anthropic orientada a construir modelos más útiles, honestos y seguros mediante alineamiento explícito.",
+      en: "Anthropic's research line oriented toward building more useful, honest, and safe models through explicit alignment."
+    }},
+  { id: "claude-product-layer", category: "concepto",
+    label: { es: "Claude · capa de producto", en: "Claude · product layer" },
+    desc: {
+      es: "Capa de producto de Anthropic para desplegar sus modelos Claude como asistentes conversacionales, API y herramientas integradas.",
+      en: "Anthropic's product layer for deploying Claude models as conversational assistants, APIs, and integrated tools."
+    }},
+
+  // ── ESCENARIOS ──
+  { id: "lenguaje-probabilidad-estadistica", category: "escenario",
+    label: { es: "Lenguaje, probabilidad y estadística", en: "Language, probability & statistics" },
+    desc: {
+      es: "Escenario intelectual donde el lenguaje se trata como un objeto analizable con herramientas estadísticas y probabilísticas.",
+      en: "Intellectual scenario where language is treated as an object analyzable with statistical and probabilistic tools."
+    }},
+  { id: "bell-labs-information-theory", category: "escenario",
+    label: { es: "Bell Labs", en: "Bell Labs" },
+    desc: {
+      es: "Laboratorio de investigación donde Shannon desarrolló la teoría de la información, en el contexto de mejora de telecomunicaciones.",
+      en: "Research laboratory where Shannon developed information theory, in the context of improving telecommunications."
+    }},
+  { id: "escuela-cibernetica", category: "escenario",
+    label: { es: "Escuela cibernética", en: "Cybernetics school" },
+    desc: {
+      es: "Tradición intelectual y ambiente de convergencia donde la cibernética se desarrolló como campo interdisciplinario en múltiples instituciones.",
+      en: "Intellectual tradition and convergence environment where cybernetics developed as an interdisciplinary field across multiple institutions."
+    }},
+  { id: "dartmouth-farm-house", category: "escenario",
+    label: { es: "Dartmouth · casa de campo", en: "Dartmouth · farmhouse" },
+    desc: {
+      es: "Lugar donde se realizó la conferencia de 1956 que dio nombre a la inteligencia artificial como campo de investigación.",
+      en: "Location where the 1956 conference that named artificial intelligence as a research field took place."
+    }},
+  { id: "instituto-cibernetica-kiev", category: "escenario",
+    label: { es: "Instituto de Cibernética de Kiev", en: "Kiev Institute of Cybernetics" },
+    desc: {
+      es: "Centro de investigación en Ucrania donde se desarrollaron contribuciones clave en cibernética, automatización y modelamiento inductivo.",
+      en: "Research center in Ukraine where key contributions to cybernetics, automation, and inductive modeling were developed."
+    }},
+  { id: "deep-learning-gpu-era", category: "escenario",
+    label: { es: "Era del deep learning con GPUs", en: "Deep learning GPU era" },
+    desc: {
+      es: "Período donde la combinación de redes profundas, grandes datasets y cómputo GPU transformó el aprendizaje automático.",
+      en: "Period where the combination of deep networks, large datasets, and GPU computing transformed machine learning."
+    }},
+  { id: "google-research-transformers", category: "escenario",
+    label: { es: "Google Research · Transformers", en: "Google Research · Transformers" },
+    desc: {
+      es: "Laboratorio donde se publicó la arquitectura Transformer y donde se desarrolló BERT.",
+      en: "Laboratory where the Transformer architecture was published and where BERT was developed."
+    }},
+  { id: "openai-gpt-product-layer", category: "escenario",
+    label: { es: "OpenAI · capa de producto GPT", en: "OpenAI · GPT product layer" },
+    desc: {
+      es: "Organización que desarrolló la serie GPT y lanzó ChatGPT, consolidando la capa de producto para modelos de lenguaje conversacionales.",
+      en: "Organization that developed the GPT series and launched ChatGPT, consolidating the product layer for conversational language models."
+    }}
+];
+
+// ── LINKS (extracted from vault Conexiones sections) ──
+// Only include connections between nodes that exist in our set
+const LINK_DATA = [
+  // 1913 Markov
+  ["1913-markov-cadenas-texto","andrey-markov"],
+  ["1913-markov-cadenas-texto","lenguaje-probabilidad-estadistica"],
+  ["1913-markov-cadenas-texto","claude-shannon"],
+  ["1913-markov-cadenas-texto","1948-teoria-informacion-shannon"],
+  ["1913-markov-cadenas-texto","escuela-cibernetica"],
+  ["1913-markov-cadenas-texto","1968-gmdh-ivakhnenko-lapa"],
+  ["1913-markov-cadenas-texto","modelos-estadisticos-de-lenguaje"],
+  // 1943
+  ["1943-neurona-logica-mcculloch-pitts","mcculloch-pitts"],
+  ["1943-neurona-logica-mcculloch-pitts","redes-neuronales-tempranas"],
+  ["1943-neurona-logica-mcculloch-pitts","teoria-de-automatas"],
+  ["1943-neurona-logica-mcculloch-pitts","cibernetica"],
+  ["1943-neurona-logica-mcculloch-pitts","frank-rosenblatt"],
+  ["1943-neurona-logica-mcculloch-pitts","1986-backpropagation"],
+  ["1943-neurona-logica-mcculloch-pitts","deep-learning"],
+  // 1948 Wiener
+  ["1948-cibernetica-wiener","norbert-wiener"],
+  ["1948-cibernetica-wiener","cibernetica"],
+  ["1948-cibernetica-wiener","control-automatico"],
+  ["1948-cibernetica-wiener","retroalimentacion-feedback"],
+  ["1948-cibernetica-wiener","sistemas-adaptativos"],
+  ["1948-cibernetica-wiener","1948-teoria-informacion-shannon"],
+  ["1948-cibernetica-wiener","mcculloch-pitts"],
+  ["1948-cibernetica-wiener","redes-neuronales-tempranas"],
+  ["1948-cibernetica-wiener","1956-dartmouth-artificial-intelligence"],
+  // 1948 Shannon
+  ["1948-teoria-informacion-shannon","claude-shannon"],
+  ["1948-teoria-informacion-shannon","andrey-markov"],
+  ["1948-teoria-informacion-shannon","bell-labs-information-theory"],
+  ["1948-teoria-informacion-shannon","lenguaje-probabilidad-estadistica"],
+  ["1948-teoria-informacion-shannon","norbert-wiener"],
+  ["1948-teoria-informacion-shannon","ruido-redundancia-codificacion"],
+  ["1948-teoria-informacion-shannon","modelos-estadisticos-de-lenguaje"],
+  // 1956 Dartmouth
+  ["1956-dartmouth-artificial-intelligence","john-mccarthy"],
+  ["1956-dartmouth-artificial-intelligence","marvin-minsky"],
+  ["1956-dartmouth-artificial-intelligence","nathaniel-rochester"],
+  ["1956-dartmouth-artificial-intelligence","claude-shannon"],
+  ["1956-dartmouth-artificial-intelligence","norbert-wiener"],
+  ["1956-dartmouth-artificial-intelligence","dartmouth-farm-house"],
+  ["1956-dartmouth-artificial-intelligence","simbolico-vs-conexionista"],
+  ["1956-dartmouth-artificial-intelligence","ai-winter"],
+  // 1968 GMDH
+  ["1968-gmdh-ivakhnenko-lapa","ivakhnenko-lapa"],
+  ["1968-gmdh-ivakhnenko-lapa","instituto-cibernetica-kiev"],
+  ["1968-gmdh-ivakhnenko-lapa","escuela-cibernetica"],
+  ["1968-gmdh-ivakhnenko-lapa","simbolico-vs-conexionista"],
+  ["1968-gmdh-ivakhnenko-lapa","frank-rosenblatt"],
+  ["1968-gmdh-ivakhnenko-lapa","1986-backpropagation"],
+  ["1968-gmdh-ivakhnenko-lapa","deep-learning-gpu-era"],
+  ["1968-gmdh-ivakhnenko-lapa","modelamiento-inductivo"],
+  ["1968-gmdh-ivakhnenko-lapa","aprendizaje-automatico"],
+  // 1986 Backprop
+  ["1986-backpropagation","frank-rosenblatt"],
+  ["1986-backpropagation","redes-neuronales-tempranas"],
+  ["1986-backpropagation","aprendizaje-automatico"],
+  ["1986-backpropagation","aprendizaje-de-representaciones"],
+  ["1986-backpropagation","deep-learning"],
+  ["1986-backpropagation","2012-alexnet-imagenet-gpu"],
+  ["1986-backpropagation","2017-transformer-attention-is-all-you-need"],
+  // 2012 AlexNet
+  ["2012-alexnet-imagenet-gpu","krizhevsky-sutskever-hinton"],
+  ["2012-alexnet-imagenet-gpu","imagenet"],
+  ["2012-alexnet-imagenet-gpu","redes-neuronales-convolucionales"],
+  ["2012-alexnet-imagenet-gpu","deep-learning"],
+  ["2012-alexnet-imagenet-gpu","gpu-computing"],
+  ["2012-alexnet-imagenet-gpu","aprendizaje-de-representaciones"],
+  ["2012-alexnet-imagenet-gpu","2020-gpt3-few-shot-learning"],
+  // 2014 Seq2Seq
+  ["2014-seq2seq-attention","bahdanau-cho-bengio"],
+  ["2014-seq2seq-attention","neural-machine-translation"],
+  ["2014-seq2seq-attention","aprendizaje-de-representaciones"],
+  ["2014-seq2seq-attention","deep-learning"],
+  ["2014-seq2seq-attention","google-research-transformers"],
+  ["2014-seq2seq-attention","2017-transformer-attention-is-all-you-need"],
+  ["2014-seq2seq-attention","vaswani-et-al"],
+  // 2017 Transformer
+  ["2017-transformer-attention-is-all-you-need","vaswani-et-al"],
+  ["2017-transformer-attention-is-all-you-need","google-research-transformers"],
+  ["2017-transformer-attention-is-all-you-need","bahdanau-cho-bengio"],
+  ["2017-transformer-attention-is-all-you-need","neural-machine-translation"],
+  ["2017-transformer-attention-is-all-you-need","deep-learning-gpu-era"],
+  ["2017-transformer-attention-is-all-you-need","2018-gpt1-generative-pretraining"],
+  ["2017-transformer-attention-is-all-you-need","2018-bert-bidirectional-transformers"],
+  ["2017-transformer-attention-is-all-you-need","2020-gpt3-few-shot-learning"],
+  ["2017-transformer-attention-is-all-you-need","2022-chatgpt-product-layer"],
+  // 2018 BERT
+  ["2018-bert-bidirectional-transformers","google-research-transformers"],
+  ["2018-bert-bidirectional-transformers","vaswani-et-al"],
+  ["2018-bert-bidirectional-transformers","aprendizaje-de-representaciones"],
+  ["2018-bert-bidirectional-transformers","procesamiento-de-lenguaje-natural"],
+  ["2018-bert-bidirectional-transformers","2018-gpt1-generative-pretraining"],
+  ["2018-bert-bidirectional-transformers","modelos-estadisticos-de-lenguaje"],
+  // 2018 GPT-1
+  ["2018-gpt1-generative-pretraining","openai-gpt-product-layer"],
+  ["2018-gpt1-generative-pretraining","vaswani-et-al"],
+  ["2018-gpt1-generative-pretraining","aprendizaje-de-representaciones"],
+  ["2018-gpt1-generative-pretraining","procesamiento-de-lenguaje-natural"],
+  ["2018-gpt1-generative-pretraining","2020-gpt3-few-shot-learning"],
+  ["2018-gpt1-generative-pretraining","2022-chatgpt-product-layer"],
+  // 2020 GPT-3
+  ["2020-gpt3-few-shot-learning","openai-gpt-product-layer"],
+  ["2020-gpt3-few-shot-learning","aprendizaje-de-representaciones"],
+  ["2020-gpt3-few-shot-learning","modelos-estadisticos-de-lenguaje"],
+  ["2020-gpt3-few-shot-learning","prompting-as-specification"],
+  ["2020-gpt3-few-shot-learning","base-model-product-layer"],
+  ["2020-gpt3-few-shot-learning","2022-chatgpt-product-layer"],
+  // 2022 Constitutional AI
+  ["2022-anthropic-constitutional-ai","2022-chatgpt-product-layer"],
+  ["2022-anthropic-constitutional-ai","rlhf-human-feedback"],
+  ["2022-anthropic-constitutional-ai","base-model-product-layer"],
+  ["2022-anthropic-constitutional-ai","prompting-as-specification"],
+  ["2022-anthropic-constitutional-ai","verification-as-practice"],
+  ["2022-anthropic-constitutional-ai","openai-gpt-product-layer"],
+  ["2022-anthropic-constitutional-ai","anthropic-ai-safety-alignment"],
+  ["2022-anthropic-constitutional-ai","claude-product-layer"],
+  // 2022 ChatGPT
+  ["2022-chatgpt-product-layer","openai-gpt-product-layer"],
+  ["2022-chatgpt-product-layer","rlhf-human-feedback"],
+  ["2022-chatgpt-product-layer","base-model-product-layer"],
+  ["2022-chatgpt-product-layer","prompting-as-specification"],
+  ["2022-chatgpt-product-layer","verification-as-practice"],
+];
+
+// ═══════════════════════════════════════════
+// BUILD GRAPH
+// ═══════════════════════════════════════════
+
+let currentLang = 'es';
+const nodeMap = new Map(NODES.map(n => [n.id, n]));
+const validIds = new Set(NODES.map(n => n.id));
+
+// Filter links to only valid node pairs
+const links = LINK_DATA
+  .filter(([s,t]) => validIds.has(s) && validIds.has(t))
+  .map(([source, target]) => ({ source, target }));
+
+// Deduplicate links
+const linkSet = new Set();
+const dedupedLinks = [];
+for (const l of links) {
+  const key = [l.source, l.target].sort().join('||');
+  if (!linkSet.has(key)) {
+    linkSet.add(key);
+    dedupedLinks.push(l);
+  }
+}
+
+const nodes = NODES.map(n => ({ ...n }));
+
+const categoryColors = {
+  inflexion: { fill: '#f85149', glow: 'rgba(248,81,73,0.5)' },
+  concepto:  { fill: '#58a6ff', glow: 'rgba(88,166,255,0.5)' },
+  persona:   { fill: '#3fb950', glow: 'rgba(63,185,80,0.5)' },
+  escenario: { fill: '#d29922', glow: 'rgba(210,153,34,0.5)' }
+};
+
+const categoryLabels = {
+  inflexion: { es: 'Puntos de inflexión', en: 'Inflection points' },
+  concepto:  { es: 'Conceptos', en: 'Concepts' },
+  persona:   { es: 'Personas', en: 'People' },
+  escenario: { es: 'Escenarios', en: 'Scenarios' }
+};
+
+const nodeRadius = d => d.category === 'inflexion' ? 8 : 5;
+
+// ── Setup SVG ──
+const container = document.getElementById('graph-container');
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+const svg = d3.select(container).append('svg')
+  .attr('width', width)
+  .attr('height', height);
+
+// Glow filter
+const defs = svg.append('defs');
+Object.entries(categoryColors).forEach(([cat, colors]) => {
+  const filter = defs.append('filter').attr('id', `glow-${cat}`);
+  filter.append('feGaussianBlur').attr('stdDeviation', 4).attr('result', 'blur');
+  filter.append('feFlood').attr('flood-color', colors.glow).attr('result', 'color');
+  filter.append('feComposite').attr('in', 'color').attr('in2', 'blur').attr('operator', 'in').attr('result', 'colorBlur');
+  const merge = filter.append('feMerge');
+  merge.append('feMergeNode').attr('in', 'colorBlur');
+  merge.append('feMergeNode').attr('in', 'SourceGraphic');
+});
+
+const g = svg.append('g');
+
+// Zoom
+const zoom = d3.zoom()
+  .scaleExtent([0.15, 4])
+  .on('zoom', e => g.attr('transform', e.transform));
+svg.call(zoom);
+
+// Simulation
+const simulation = d3.forceSimulation(nodes)
+  .force('link', d3.forceLink(dedupedLinks).id(d => d.id).distance(80).strength(0.3))
+  .force('charge', d3.forceManyBody().strength(-200))
+  .force('center', d3.forceCenter(width / 2, height / 2))
+  .force('collision', d3.forceCollide().radius(d => nodeRadius(d) + 12))
+  .force('x', d3.forceX(width / 2).strength(0.03))
+  .force('y', d3.forceY(height / 2).strength(0.03));
+
+// Links
+const linkGroup = g.append('g').attr('class', 'links');
+const link = linkGroup.selectAll('line')
+  .data(dedupedLinks)
+  .join('line')
+  .attr('stroke', 'rgba(139,148,158,0.15)')
+  .attr('stroke-width', 0.8);
+
+// Nodes
+const nodeGroup = g.append('g').attr('class', 'nodes');
+const node = nodeGroup.selectAll('g')
+  .data(nodes)
+  .join('g')
+  .attr('cursor', 'pointer')
+  .call(d3.drag()
+    .on('start', dragstarted)
+    .on('drag', dragged)
+    .on('end', dragended));
+
+node.append('circle')
+  .attr('r', nodeRadius)
+  .attr('fill', d => categoryColors[d.category].fill)
+  .attr('filter', d => `url(#glow-${d.category})`)
+  .attr('stroke', 'none')
+  .attr('opacity', 0.9);
+
+// Labels
+const labels = node.append('text')
+  .attr('dx', d => nodeRadius(d) + 4)
+  .attr('dy', '0.35em')
+  .attr('font-size', d => d.category === 'inflexion' ? '9px' : '8px')
+  .attr('font-family', 'Inter, sans-serif')
+  .attr('font-weight', d => d.category === 'inflexion' ? 500 : 400)
+  .attr('fill', 'rgba(230,237,243,0.7)')
+  .attr('pointer-events', 'none')
+  .text(d => d.label[currentLang]);
+
+// ── Interactions ──
+const tooltip = document.getElementById('tooltip');
+const detailPanel = document.getElementById('detail-panel');
+const detailContent = document.getElementById('detail-content');
+
+// Hover
+node.on('mouseover', function(event, d) {
+  // Highlight connected
+  const connected = new Set();
+  dedupedLinks.forEach(l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sid === d.id) connected.add(tid);
+    if (tid === d.id) connected.add(sid);
+  });
+  connected.add(d.id);
+
+  node.select('circle')
+    .attr('opacity', n => connected.has(n.id) ? 1 : 0.12);
+  labels
+    .attr('fill', n => connected.has(n.id) ? 'rgba(230,237,243,0.9)' : 'rgba(230,237,243,0.1)');
+  link
+    .attr('stroke', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return (sid === d.id || tid === d.id) ? 'rgba(139,148,158,0.55)' : 'rgba(139,148,158,0.04)';
+    })
+    .attr('stroke-width', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return (sid === d.id || tid === d.id) ? 1.5 : 0.5;
+    });
+
+  // Tooltip
+  tooltip.textContent = d.label[currentLang];
+  tooltip.classList.add('visible');
+  tooltip.style.left = (event.clientX + 14) + 'px';
+  tooltip.style.top = (event.clientY - 10) + 'px';
+})
+.on('mousemove', function(event) {
+  tooltip.style.left = (event.clientX + 14) + 'px';
+  tooltip.style.top = (event.clientY - 10) + 'px';
+})
+.on('mouseout', function() {
+  node.select('circle').attr('opacity', 0.9);
+  labels.attr('fill', 'rgba(230,237,243,0.7)');
+  link.attr('stroke', 'rgba(139,148,158,0.15)').attr('stroke-width', 0.8);
+  tooltip.classList.remove('visible');
+});
+
+// Click → detail panel
+node.on('click', function(event, d) {
+  event.stopPropagation();
+  openPanel(d);
+});
+
+svg.on('click', () => closePanel());
+
+function openPanel(d) {
+  // Find connections
+  const connections = [];
+  dedupedLinks.forEach(l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sid === d.id && nodeMap.has(tid)) connections.push(nodeMap.get(tid));
+    if (tid === d.id && nodeMap.has(sid)) connections.push(nodeMap.get(sid));
+  });
+
+  const catLabel = categoryLabels[d.category][currentLang];
+  const connChips = connections.map(c =>
+    `<span class="detail-conn-chip" onclick="navigateTo('${c.id}')">${c.label[currentLang]}</span>`
+  ).join('');
+
+  const sectionTitle = {
+    connections: { es: 'Conexiones', en: 'Connections' },
+  };
+
+  detailContent.innerHTML = `
+    <span class="detail-category ${d.category}">${catLabel}</span>
+    <h2 class="detail-title">${d.label[currentLang]}</h2>
+    <p class="detail-description">${d.desc[currentLang]}</p>
+    ${connections.length ? `
+      <p class="detail-section-title">${sectionTitle.connections[currentLang]} (${connections.length})</p>
+      <div class="detail-connections">${connChips}</div>
+    ` : ''}
+  `;
+  detailPanel.classList.add('open');
+}
+
+function closePanel() {
+  detailPanel.classList.remove('open');
+}
+
+window.navigateTo = function(id) {
+  const n = nodeMap.get(id);
+  if (n) {
+    const nodeData = nodes.find(nd => nd.id === id);
+    if (nodeData) openPanel(nodeData);
+  }
+};
+
+// ── Tick ──
+simulation.on('tick', () => {
+  link
+    .attr('x1', d => d.source.x)
+    .attr('y1', d => d.source.y)
+    .attr('x2', d => d.target.x)
+    .attr('y2', d => d.target.y);
+
+  node.attr('transform', d => `translate(${d.x},${d.y})`);
+});
+
+function dragstarted(event, d) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x; d.fy = d.y;
+}
+function dragged(event, d) {
+  d.fx = event.x; d.fy = event.y;
+}
+function dragended(event, d) {
+  if (!event.active) simulation.alphaTarget(0);
+  d.fx = null; d.fy = null;
+}
+
+// ── Legend ──
+function renderLegend() {
+  const legend = document.getElementById('legend');
+  const cats = ['inflexion','concepto','persona','escenario'];
+  const counts = {};
+  cats.forEach(c => counts[c] = nodes.filter(n => n.category === c).length);
+
+  legend.innerHTML = cats.map(c => `
+    <div class="legend-item">
+      <span class="legend-dot" style="background:${categoryColors[c].fill};box-shadow:0 0 6px ${categoryColors[c].glow}"></span>
+      <span>${categoryLabels[c][currentLang]} (${counts[c]})</span>
+    </div>
+  `).join('');
+}
+renderLegend();
+
+// ── Node count ──
+document.getElementById('node-count').textContent = `${nodes.length} nodos · ${dedupedLinks.length} conexiones`;
+
+// ── Search ──
+const searchInput = document.getElementById('search');
+searchInput.addEventListener('input', function() {
+  const q = this.value.toLowerCase().trim();
+  if (!q) {
+    node.select('circle').attr('opacity', 0.9);
+    labels.attr('fill', 'rgba(230,237,243,0.7)');
+    link.attr('stroke', 'rgba(139,148,158,0.15)').attr('stroke-width', 0.8);
+    return;
+  }
+
+  const matches = new Set();
+  nodes.forEach(n => {
+    if (n.label[currentLang].toLowerCase().includes(q) || n.id.includes(q)) {
+      matches.add(n.id);
+    }
+  });
+
+  node.select('circle').attr('opacity', n => matches.has(n.id) ? 1 : 0.08);
+  labels.attr('fill', n => matches.has(n.id) ? '#fff' : 'rgba(230,237,243,0.08)');
+
+  if (matches.size === 1) {
+    const matchId = [...matches][0];
+    const connected = new Set([matchId]);
+    dedupedLinks.forEach(l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      if (sid === matchId) connected.add(tid);
+      if (tid === matchId) connected.add(sid);
+    });
+    node.select('circle').attr('opacity', n => connected.has(n.id) ? 1 : 0.08);
+    labels.attr('fill', n => connected.has(n.id) ? 'rgba(230,237,243,0.9)' : 'rgba(230,237,243,0.08)');
+    link.attr('stroke', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return (sid === matchId || tid === matchId) ? 'rgba(139,148,158,0.55)' : 'rgba(139,148,158,0.03)';
+    });
+  }
+});
+
+// ── Language toggle ──
+window.setLang = function(lang) {
+  currentLang = lang;
+  document.getElementById('btn-es').classList.toggle('active', lang === 'es');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+
+  // Update labels
+  labels.text(d => d.label[currentLang]);
+
+  // Update title
+  document.getElementById('main-title').textContent =
+    lang === 'es' ? 'Genealogía de la IA' : 'Genealogy of AI';
+
+  // Update node count
+  document.getElementById('node-count').textContent =
+    lang === 'es'
+      ? `${nodes.length} nodos · ${dedupedLinks.length} conexiones`
+      : `${nodes.length} nodes · ${dedupedLinks.length} connections`;
+
+  // Update search placeholder
+  searchInput.placeholder = lang === 'es' ? 'Buscar nodo...' : 'Search node...';
+
+  // Update legend
+  renderLegend();
+
+  // Update instructions
+  document.getElementById('instr-title').textContent = lang === 'es' ? 'Navegación' : 'Navigation';
+  document.getElementById('instr-drag').textContent = lang === 'es' ? 'Arrastrar' : 'Drag';
+  document.getElementById('instr-scroll').textContent = 'Scroll';
+  document.getElementById('instr-click').textContent = lang === 'es' ? 'Clic' : 'Click';
+  document.getElementById('instr-hover').textContent = 'Hover';
+
+  // Refresh panel if open
+  if (detailPanel.classList.contains('open')) {
+    const currentTitle = detailContent.querySelector('.detail-title');
+    // Reopen with same node
+  }
+
+  // Update HTML lang
+  document.documentElement.lang = lang;
+};
+
+// ── Resize ──
+window.addEventListener('resize', () => {
+  svg.attr('width', window.innerWidth).attr('height', window.innerHeight);
+  simulation.force('center', d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2));
+  simulation.alpha(0.1).restart();
+});
+
+// ── Initial zoom to fit ──
+setTimeout(() => {
+  const padding = 60;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  nodes.forEach(n => {
+    if (n.x < minX) minX = n.x;
+    if (n.x > maxX) maxX = n.x;
+    if (n.y < minY) minY = n.y;
+    if (n.y > maxY) maxY = n.y;
+  });
+  const dx = maxX - minX + padding * 2;
+  const dy = maxY - minY + padding * 2;
+  const scale = Math.min(width / dx, height / dy, 1.2);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const transform = d3.zoomIdentity
+    .translate(width / 2, height / 2)
+    .scale(scale)
+    .translate(-cx, -cy);
+  svg.transition().duration(1000).call(zoom.transform, transform);
+}, 2500);
+
+// Fade out instructions
+setTimeout(() => {
+  document.getElementById('instructions').style.opacity = '0';
+  setTimeout(() => document.getElementById('instructions').style.display = 'none', 600);
+}, 12000);
+</script>
+</body>
+</html>
