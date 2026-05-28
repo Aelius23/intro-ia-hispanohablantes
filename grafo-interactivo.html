@@ -398,6 +398,40 @@
 
   #timeline-container svg { width: 100%; height: 100%; }
 
+  /* ─── Timeline Legend ─── */
+  .tl-legend {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: var(--bg-panel-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    z-index: 100;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tl-legend.active { display: flex; }
+
+  .tl-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .tl-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
   .tl-scroll-hint {
     position: fixed;
     bottom: 20px;
@@ -463,6 +497,13 @@
 <div id="graph-container"></div>
 <div id="timeline-container"></div>
 <div class="tl-scroll-hint" id="scroll-hint">← Arrastra y usa scroll para zoom →</div>
+
+<div class="tl-legend" id="tl-legend">
+  <div class="tl-legend-item"><span class="tl-legend-dot" style="background:#f85149"></span><span data-es="Puntos de inflexión" data-en="Inflection points">Puntos de inflexión</span></div>
+  <div class="tl-legend-item"><span class="tl-legend-dot" style="background:#3fb950"></span><span data-es="Personas" data-en="People">Personas</span></div>
+  <div class="tl-legend-item"><span class="tl-legend-dot" style="background:#58a6ff"></span><span data-es="Conceptos" data-en="Concepts">Conceptos</span></div>
+  <div class="tl-legend-item"><span class="tl-legend-dot" style="background:#d29922"></span><span data-es="Escenarios" data-en="Scenarios">Escenarios</span></div>
+</div>
 
 <div class="detail-panel" id="detail-panel">
   <button class="close-btn" onclick="closePanel()">×</button>
@@ -1337,6 +1378,14 @@ window.setLang = function(lang) {
     // Reopen with same node
   }
 
+  // Update timeline legend
+  const tlLegend = document.getElementById('tl-legend');
+  if (tlLegend) {
+    tlLegend.querySelectorAll('[data-es]').forEach(el => {
+      el.textContent = el.getAttribute('data-' + lang);
+    });
+  }
+
   // Update HTML lang
   document.documentElement.lang = lang;
 };
@@ -1424,46 +1473,51 @@ function buildTimeline() {
   tlSvg = d3.select(tlContainer).append('svg')
     .attr('width', W).attr('height', H);
 
-  // Defs — glow filters
-  const tlDefs = tlSvg.append('defs');
-  Object.entries(categoryColors).forEach(([cat, colors]) => {
-    const f = tlDefs.append('filter').attr('id', `tl-glow-${cat}`);
-    f.append('feGaussianBlur').attr('stdDeviation', 2).attr('result', 'b');
-    f.append('feFlood').attr('flood-color', colors.glow).attr('result', 'c');
-    f.append('feComposite').attr('in', 'c').attr('in2', 'b').attr('operator', 'in').attr('result', 'cb');
-    const m = f.append('feMerge');
-    m.append('feMergeNode').attr('in', 'cb');
-    m.append('feMergeNode').attr('in', 'SourceGraphic');
-  });
-
   tlG = tlSvg.append('g');
 
   // Year labels group (separate so we can rescale independently)
   const yearLabelsG = tlG.append('g').attr('class', 'year-labels');
+  // Bar labels group (inverse-scaled, capped at bar height)
+  const barLabelsG = tlG.append('g').attr('class', 'bar-labels');
 
-  // Zoom/pan with dynamic year label scaling
+  // Zoom/pan with dynamic label scaling
   let currentScale = 1;
   tlZoom = d3.zoom()
-    .scaleExtent([0.08, 5])
+    .scaleExtent([0.15, 8])
     .on('zoom', e => {
       tlG.attr('transform', e.transform);
       currentScale = e.transform.k;
-      // Scale year labels inversely — they stay readable at any zoom
+
+      // Scale year labels inversely — always render at base size on screen
       yearLabelsG.selectAll('text').each(function() {
-        const baseSize = +d3.select(this).attr('data-base-size');
-        d3.select(this).attr('font-size', (baseSize / currentScale) + 'px');
+        const el = d3.select(this);
+        const baseSize = +el.attr('data-base-size');
+        const tier = el.attr('data-tier');
+        el.attr('font-size', (baseSize / currentScale) + 'px');
+      });
+
+      // Scale bar labels inversely, capped at bar screen height
+      const trackH = 80, trackGap = 6;
+      const barScreenH = trackH * currentScale;
+      barLabelsG.selectAll('text').each(function() {
+        const el = d3.select(this);
+        const baseSize = +el.attr('data-base-size');
+        // Cap text at 75% of bar screen height to prevent vertical overlap
+        const screenSize = Math.min(baseSize, barScreenH * 0.75);
+        el.attr('font-size', (screenSize / currentScale) + 'px');
       });
     });
   tlSvg.call(tlZoom);
 
-  renderPremiere(yearLabelsG);
+  renderPremiere(yearLabelsG, barLabelsG);
 
-  // Initial zoom: show ~25 years centered on 1945
+  // Initial zoom: show ~50 years centered on 1955
   setTimeout(() => {
-    const viewYears = 25;
+    const viewYears = 50;
     const targetScale = W / (viewYears * TL_PX_PER_YEAR);
-    const startYear = 1942;
-    const tx = -(startYear - 1900) * TL_PX_PER_YEAR * targetScale + 40;
+    const centerYear = 1955;
+    const cx = (centerYear - 1900) * TL_PX_PER_YEAR;
+    const tx = W / 2 - cx * targetScale;
     tlSvg.call(tlZoom.transform, d3.zoomIdentity.translate(tx, 10).scale(targetScale));
   }, 50);
 }
@@ -1546,7 +1600,7 @@ const SPANS = {
   'cybernetics': [1942, 1975],
 };
 
-function renderPremiere(yearLabelsG) {
+function renderPremiere(yearLabelsG, barLabelsG) {
   tlG.selectAll('.tl-content').remove();
   const contentG = tlG.append('g').attr('class', 'tl-content');
 
@@ -1582,26 +1636,26 @@ function renderPremiere(yearLabelsG) {
       contentG.append('line')
         .attr('x1', x).attr('y1', rulerH - 40)
         .attr('x2', x).attr('y2', rulerH)
-        .attr('stroke', '#ffffff').attr('stroke-width', 2);
+        .attr('stroke', '#8b949e').attr('stroke-width', 1.5);
     } else if (isMid) {
       contentG.append('line')
         .attr('x1', x).attr('y1', rulerH - 20)
         .attr('x2', x).attr('y2', rulerH)
-        .attr('stroke', '#6e7681').attr('stroke-width', 1);
+        .attr('stroke', '#484f58').attr('stroke-width', 1);
     } else {
       contentG.append('line')
         .attr('x1', x).attr('y1', rulerH - 10)
         .attr('x2', x).attr('y2', rulerH)
-        .attr('stroke', '#30363d').attr('stroke-width', 1);
+        .attr('stroke', '#30363d').attr('stroke-width', 0.5);
     }
   }
 
   contentG.append('line')
     .attr('x1', -500).attr('y1', rulerH)
     .attr('x2', totalW + 500).attr('y2', rulerH)
-    .attr('stroke', '#30363d').attr('stroke-width', 2);
+    .attr('stroke', '#30363d').attr('stroke-width', 1);
 
-  // ── YEAR LABELS (dynamic-scaling) ──
+  // ── YEAR LABELS (inverse-scaled) ──
   yearLabelsG.selectAll('*').remove();
   for (let yr = 1900; yr <= 2025; yr++) {
     const x = (yr - minYear) * pxPerYear;
@@ -1612,19 +1666,21 @@ function renderPremiere(yearLabelsG) {
       yearLabelsG.append('text')
         .attr('x', x).attr('y', rulerH - 46)
         .attr('text-anchor', 'middle')
-        .attr('font-family', 'Helvetica, Arial, sans-serif')
-        .attr('font-size', '32px')
-        .attr('data-base-size', 32)
+        .attr('font-family', 'Inter, Helvetica, Arial, sans-serif')
+        .attr('font-size', '28px')
+        .attr('data-base-size', 28)
+        .attr('data-tier', 'major')
         .attr('font-weight', '700')
-        .attr('fill', '#ffffff')
+        .attr('fill', '#e6edf3')
         .text(yr);
     } else if (isMid) {
       yearLabelsG.append('text')
         .attr('x', x).attr('y', rulerH - 24)
         .attr('text-anchor', 'middle')
-        .attr('font-family', 'Helvetica, Arial, sans-serif')
-        .attr('font-size', '18px')
-        .attr('data-base-size', 18)
+        .attr('font-family', 'Inter, Helvetica, Arial, sans-serif')
+        .attr('font-size', '13px')
+        .attr('data-base-size', 13)
+        .attr('data-tier', 'minor')
         .attr('font-weight', '400')
         .attr('fill', '#8b949e')
         .text(yr);
@@ -1639,7 +1695,7 @@ function renderPremiere(yearLabelsG) {
       .attr('x1', x).attr('y1', rulerH)
       .attr('x2', x).attr('y2', 8000)
       .attr('stroke', isMajor ? '#21262d' : '#161b22')
-      .attr('stroke-width', isMajor ? 1.5 : 0.5);
+      .attr('stroke-width', isMajor ? 1 : 0.5);
   }
 
   // ── COLLECT & BIN-PACK ──
@@ -1666,6 +1722,7 @@ function renderPremiere(yearLabelsG) {
   });
 
   // ── DRAW BARS ──
+
   allBars.forEach(bar => {
     const x1 = (bar.start - minYear) * pxPerYear;
     const x2 = (bar.end - minYear) * pxPerYear;
@@ -1683,29 +1740,32 @@ function renderPremiere(yearLabelsG) {
       .attr('rx', 6)
       .attr('fill', fills.bg);
 
-    // Left accent
+    // Left accent stripe
     barG.append('rect')
       .attr('x', x1).attr('y', by)
       .attr('width', 6).attr('height', trackH)
       .attr('rx', 3)
       .attr('fill', fills.accent);
 
-    // Clip
-    const clipId = `c${n.id.replace(/[^a-z0-9]/gi, '')}`;
+    // Clip path for bar label (clips text at bar's right edge)
+    const clipId = `cl${n.id.replace(/[^a-z0-9]/gi, '')}`;
     contentG.append('clipPath').attr('id', clipId)
       .append('rect')
-      .attr('x', x1 + 14).attr('y', by)
-      .attr('width', Math.max(bw - 20, 1)).attr('height', trackH);
+      .attr('x', x1).attr('y', by - trackH)
+      .attr('width', bw).attr('height', trackH * 3);
 
-    // Label — 22px normal weight Helvetica white
-    barG.append('text')
-      .attr('x', x1 + 18)
-      .attr('y', by + trackH / 2 + 8)
-      .attr('font-family', 'Helvetica, Arial, sans-serif')
-      .attr('font-size', '22px')
-      .attr('font-weight', '400')
-      .attr('fill', '#ffffff')
+    // Label — inverse-scaled, placed in barLabelsG, clipped to bar width
+    barLabelsG.append('text')
+      .attr('x', x1 + 14)
+      .attr('y', by + trackH / 2)
+      .attr('dominant-baseline', 'central')
+      .attr('font-family', 'Inter, Helvetica, Arial, sans-serif')
+      .attr('font-size', '16px')
+      .attr('data-base-size', 16)
+      .attr('font-weight', '500')
+      .attr('fill', '#e6edf3')
       .attr('clip-path', `url(#${clipId})`)
+      .attr('pointer-events', 'none')
       .text(n.label[currentLang]);
 
     // Hover
@@ -1731,6 +1791,10 @@ function renderPremiere(yearLabelsG) {
     });
   });
 
+  // Raise label groups above content so text paints on top of bars
+  yearLabelsG.raise();
+  barLabelsG.raise();
+
   tlSvg.on('click', () => closePanel());
 }
 
@@ -1745,12 +1809,14 @@ window.setView = function(view) {
   const legendEl = document.getElementById('legend');
   const instrEl = document.getElementById('instructions');
   const scrollHint = document.getElementById('scroll-hint');
+  const tlLegend = document.getElementById('tl-legend');
 
   if (view === 'graph') {
     graphEl.classList.remove('hidden');
     tlEl.classList.remove('active');
     legendEl.style.display = '';
     scrollHint.style.display = 'none';
+    tlLegend.classList.remove('active');
     simulation.alpha(0.1).restart();
   } else {
     graphEl.classList.add('hidden');
@@ -1758,6 +1824,11 @@ window.setView = function(view) {
     legendEl.style.display = 'none';
     if (instrEl) instrEl.style.display = 'none';
     scrollHint.style.display = 'block';
+    tlLegend.classList.add('active');
+    // Update legend text for current language
+    tlLegend.querySelectorAll('[data-es]').forEach(el => {
+      el.textContent = el.getAttribute('data-' + currentLang);
+    });
     buildTimeline();
     setTimeout(() => { scrollHint.style.display = 'none'; }, 4000);
   }
