@@ -30,7 +30,7 @@ Es parte del currículo del curso **"Introducción a la IA para hispanohablantes
 ### Créditos
 
 - **Currículo e investigación histórica**: [Sandra Acevedo](https://github.com/SandraAcevedoA) — compiló la historia, las descripciones y la estructura pedagógica del curso
-- **Desarrollo de la aplicación**: [Spencer Toulouse](https://github.com/Aelius23) — integró los archivos markdown y la estructura web de Sandra en la aplicación interactiva (grafo + línea de tiempo)
+- **Desarrollo de la aplicación**: [Spencer Toulouse](https://github.com/Aelius23) — integró los archivos markdown y la estructura web de Sandra en la aplicación interactiva (grafo + línea de tiempo), diseñada para compatibilidad con [HedgeDoc](https://hedgedoc.org/)
 - **Asistencia de programación**: Claude (Anthropic)
 
 ---
@@ -55,5 +55,5 @@ It is part of the curriculum for the course **"Introducción a la IA para hispan
 ### Credits
 
 - **Curriculum & historical research**: [Sandra Acevedo](https://github.com/SandraAcevedoA) — compiled the history, descriptions, and pedagogical structure of the course
-- **Application development**: [Spencer Toulouse](https://github.com/Aelius23) — stitched together Sandra's markdown files and web structure into the interactive application (graph + timeline)
+- **Application development**: [Spencer Toulouse](https://github.com/Aelius23) — stitched together Sandra's markdown files and web structure into the interactive application (graph + timeline), built for [HedgeDoc](https://hedgedoc.org/) compatibility
 - **Programming assistance**: Claude (Anthropic)
