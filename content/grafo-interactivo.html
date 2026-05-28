@@ -355,6 +355,105 @@
     color: var(--text-dim);
   }
 
+  /* ─── View toggle ─── */
+  .view-toggle {
+    display: flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .view-btn {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-dim);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .view-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  /* ─── Timeline ─── */
+  #timeline-container {
+    width: 100%;
+    height: calc(100vh - 48px);
+    position: absolute;
+    top: 48px;
+    left: 0;
+    overflow: hidden;
+    display: none;
+    background: var(--bg);
+  }
+
+  #timeline-container.active { display: block; }
+  #graph-container.hidden { display: none; }
+
+  #timeline-container svg { width: 100%; height: 100%; }
+
+  /* ─── Timeline Legend ─── */
+  .tl-legend {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: var(--bg-panel-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    z-index: 100;
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .tl-legend.active { display: flex; }
+
+  .tl-legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+  }
+
+  .tl-legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 3px;
+    flex-shrink: 0;
+  }
+
+  .tl-scroll-hint {
+    position: fixed;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: var(--bg-panel-glass);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    padding: 8px 20px;
+    font-size: 11px;
+    color: var(--text-muted);
+    z-index: 100;
+    display: none;
+    animation: pulse-hint 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse-hint {
+    0%, 100% { opacity: 0.6; }
+    50% { opacity: 1; }
+  }
+
   @media (max-width: 768px) {
     .detail-panel { width: 100%; }
     .search-input { width: 120px; }
@@ -370,6 +469,10 @@
     <span class="node-count" id="node-count"></span>
   </div>
   <div class="top-bar-controls">
+    <div class="view-toggle">
+      <button class="view-btn active" id="btn-graph" onclick="setView('graph')">⬡ Grafo</button>
+      <button class="view-btn" id="btn-timeline" onclick="setView('timeline')">▸ Línea</button>
+    </div>
     <div class="search-container">
       <span class="search-icon">⌕</span>
       <input type="text" class="search-input" id="search" placeholder="Buscar nodo...">
@@ -392,6 +495,15 @@
 </div>
 
 <div id="graph-container"></div>
+<div id="timeline-container"></div>
+<div class="tl-scroll-hint" id="scroll-hint">← Arrastra y usa scroll para zoom →</div>
+
+<div class="tl-legend" id="tl-legend">
+  <div class="tl-legend-item"><span class="tl-legend-dot" style="background:#f85149"></span><span data-es="Puntos de inflexión" data-en="Inflection points">Puntos de inflexión</span></div>
+  <div class="tl-legend-item"><span class="tl-legend-dot" style="background:#3fb950"></span><span data-es="Personas" data-en="People">Personas</span></div>
+  <div class="tl-legend-item"><span class="tl-legend-dot" style="background:#58a6ff"></span><span data-es="Conceptos" data-en="Concepts">Conceptos</span></div>
+  <div class="tl-legend-item"><span class="tl-legend-dot" style="background:#d29922"></span><span data-es="Escenarios" data-en="Scenarios">Escenarios</span></div>
+</div>
 
 <div class="detail-panel" id="detail-panel">
   <button class="close-btn" onclick="closePanel()">×</button>
@@ -1266,6 +1378,14 @@ window.setLang = function(lang) {
     // Reopen with same node
   }
 
+  // Update timeline legend
+  const tlLegend = document.getElementById('tl-legend');
+  if (tlLegend) {
+    tlLegend.querySelectorAll('[data-es]').forEach(el => {
+      el.textContent = el.getAttribute('data-' + lang);
+    });
+  }
+
   // Update HTML lang
   document.documentElement.lang = lang;
 };
@@ -1304,6 +1424,430 @@ setTimeout(() => {
   document.getElementById('instructions').style.opacity = '0';
   setTimeout(() => document.getElementById('instructions').style.display = 'none', 600);
 }, 12000);
+
+// ═══════════════════════════════════════════
+// TIMELINE VIEW — Stacked Bars with Zoom/Pan
+// ═══════════════════════════════════════════
+
+let currentView = 'graph';
+let timelineBuilt = false;
+let tlSvg, tlG, tlZoom;
+const expandedEras = new Set();
+
+function extractYear(id) {
+  const m = id.match(/^(\d{4})/);
+  return m ? parseInt(m[1]) : null;
+}
+
+function assignEra(nodeId) {
+  const connected = [];
+  dedupedLinks.forEach(l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sid === nodeId) { const y = extractYear(tid); if (y) connected.push(y); }
+    if (tid === nodeId) { const y = extractYear(sid); if (y) connected.push(y); }
+  });
+  if (connected.length === 0) return 1950;
+  return Math.round(connected.reduce((a,b) => a+b, 0) / connected.length);
+}
+
+function getConnectedNodes(nodeId) {
+  const result = [];
+  dedupedLinks.forEach(l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sid === nodeId && nodeMap.has(tid)) result.push(nodeMap.get(tid));
+    if (tid === nodeId && nodeMap.has(sid)) result.push(nodeMap.get(sid));
+  });
+  return result;
+}
+
+function buildTimeline() {
+  const tlContainer = document.getElementById('timeline-container');
+  tlContainer.innerHTML = '';
+  timelineBuilt = true;
+
+  const W = window.innerWidth;
+  const H = window.innerHeight - 48;
+
+  tlSvg = d3.select(tlContainer).append('svg')
+    .attr('width', W).attr('height', H);
+
+  tlG = tlSvg.append('g');
+
+  // Year labels group (separate so we can rescale independently)
+  const yearLabelsG = tlG.append('g').attr('class', 'year-labels');
+  // Bar labels group (inverse-scaled, capped at bar height)
+  const barLabelsG = tlG.append('g').attr('class', 'bar-labels');
+
+  // Zoom/pan with dynamic label scaling
+  let currentScale = 1;
+  tlZoom = d3.zoom()
+    .scaleExtent([0.15, 8])
+    .on('zoom', e => {
+      tlG.attr('transform', e.transform);
+      currentScale = e.transform.k;
+
+      // Scale year labels inversely — always render at base size on screen
+      yearLabelsG.selectAll('text').each(function() {
+        const el = d3.select(this);
+        const baseSize = +el.attr('data-base-size');
+        const tier = el.attr('data-tier');
+        el.attr('font-size', (baseSize / currentScale) + 'px');
+      });
+
+      // Scale bar labels inversely, capped at bar screen height
+      const trackH = 80, trackGap = 6;
+      const barScreenH = trackH * currentScale;
+      barLabelsG.selectAll('text').each(function() {
+        const el = d3.select(this);
+        const baseSize = +el.attr('data-base-size');
+        // Cap text at 75% of bar screen height to prevent vertical overlap
+        const screenSize = Math.min(baseSize, barScreenH * 0.75);
+        el.attr('font-size', (screenSize / currentScale) + 'px');
+      });
+    });
+  tlSvg.call(tlZoom);
+
+  renderPremiere(yearLabelsG, barLabelsG);
+
+  // Initial zoom: show ~50 years centered on 1955
+  setTimeout(() => {
+    const viewYears = 50;
+    const targetScale = W / (viewYears * TL_PX_PER_YEAR);
+    const centerYear = 1955;
+    const cx = (centerYear - 1900) * TL_PX_PER_YEAR;
+    const tx = W / 2 - cx * targetScale;
+    tlSvg.call(tlZoom.transform, d3.zoomIdentity.translate(tx, 10).scale(targetScale));
+  }, 50);
+}
+
+// Global timeline constants
+const TL_PX_PER_YEAR = 100;
+
+// ═══════════════════════════════════════
+// TIME SPAN DATA — every node gets a start/end year
+// ═══════════════════════════════════════
+const SPANS = {
+  // INFLEXION
+  '1913-markov-cadenas-texto': [1906, 1920],
+  '1943-neurona-logica-mcculloch-pitts': [1940, 1948],
+  '1948-cibernetica-wiener': [1948, 1960],
+  '1948-teoria-informacion-shannon': [1948, 1960],
+  '1956-dartmouth-artificial-intelligence': [1955, 1960],
+  '1968-gmdh-ivakhnenko-lapa': [1965, 1978],
+  '1986-backpropagation': [1985, 1998],
+  '2012-alexnet-imagenet-gpu': [2012, 2015],
+  '2014-seq2seq-attention': [2014, 2017],
+  '2017-transformer-attention-is-all-you-need': [2017, 2019],
+  '2018-bert-bidirectional-transformers': [2018, 2021],
+  '2018-gpt1-generative-pretraining': [2018, 2020],
+  '2020-gpt3-few-shot-learning': [2020, 2022],
+  '2022-anthropic-constitutional-ai': [2022, 2025],
+  '2022-chatgpt-product-layer': [2022, 2025],
+  // PERSONAS
+  'andrey-markov': [1906, 1922],
+  'mcculloch-pitts': [1940, 1952],
+  'norbert-wiener': [1940, 1964],
+  'claude-shannon': [1937, 1965],
+  'john-mccarthy': [1955, 1975],
+  'marvin-minsky': [1956, 1985],
+  'nathaniel-rochester': [1953, 1962],
+  'frank-rosenblatt': [1957, 1971],
+  'ivakhnenko-lapa': [1962, 1982],
+  'krizhevsky-sutskever-hinton': [2009, 2016],
+  'bahdanau-cho-bengio': [2013, 2017],
+  'vaswani-et-al': [2016, 2020],
+  'viktor-glushkov': [1956, 1982],
+  // CONCEPTOS
+  'probabilidad-condicional': [1900, 1950],
+  'modelos-estadisticos-de-lenguaje': [1948, 1995],
+  'n-gramas': [1948, 2005],
+  'cibernetica': [1948, 1975],
+  'control-automatico': [1940, 1972],
+  'retroalimentacion-feedback': [1940, 1965],
+  'sistemas-adaptativos': [1950, 1978],
+  'teoria-de-automatas': [1936, 1972],
+  'redes-neuronales-tempranas': [1943, 1970],
+  'simbolico-vs-conexionista': [1956, 2005],
+  'ai-winter': [1974, 1993],
+  'modelamiento-inductivo': [1965, 1982],
+  'aprendizaje-automatico': [1980, 2015],
+  'aprendizaje-de-representaciones': [2006, 2020],
+  'deep-learning': [2006, 2025],
+  'gpu-computing': [2007, 2025],
+  'imagenet': [2009, 2017],
+  'redes-neuronales-convolucionales': [1989, 2018],
+  'neural-machine-translation': [2014, 2022],
+  'procesamiento-de-lenguaje-natural': [1950, 2025],
+  'reconocimiento-de-habla': [1952, 2020],
+  'ruido-redundancia-codificacion': [1948, 1972],
+  'base-model-product-layer': [2020, 2025],
+  'prompting-as-specification': [2020, 2025],
+  'verification-as-practice': [2022, 2025],
+  'rlhf-human-feedback': [2017, 2025],
+  'anthropic-ai-safety-alignment': [2016, 2025],
+  'claude-product-layer': [2023, 2025],
+  // ESCENARIOS
+  'lenguaje-probabilidad-estadistica': [1910, 1960],
+  'bell-labs-information-theory': [1925, 1970],
+  'escuela-cibernetica': [1942, 1975],
+  'dartmouth-farm-house': [1955, 1958],
+  'instituto-cibernetica-kiev': [1962, 1990],
+  'deep-learning-gpu-era': [2009, 2025],
+  'google-research-transformers': [2015, 2025],
+  'openai-gpt-product-layer': [2018, 2025],
+  'cybernetics': [1942, 1975],
+};
+
+function renderPremiere(yearLabelsG, barLabelsG) {
+  tlG.selectAll('.tl-content').remove();
+  const contentG = tlG.append('g').attr('class', 'tl-content');
+
+  const minYear = 1900;
+  const maxYear = 2027;
+  const pxPerYear = TL_PX_PER_YEAR;
+  const totalW = (maxYear - minYear) * pxPerYear;
+
+  const trackH = 80;
+  const trackGap = 6;
+  const rulerH = 90;
+
+  const solidFills = {
+    inflexion: { bg: '#5c1a17', hover: '#8b2e28', text: '#ffffff', accent: '#f85149' },
+    persona:   { bg: '#143d1e', hover: '#1e5e2d', text: '#ffffff', accent: '#3fb950' },
+    concepto:  { bg: '#0f2d4d', hover: '#174878', text: '#ffffff', accent: '#58a6ff' },
+    escenario: { bg: '#45340d', hover: '#6b500f', text: '#ffffff', accent: '#d29922' },
+  };
+
+  // ── RULER BACKGROUND ──
+  contentG.append('rect')
+    .attr('x', -500).attr('y', 0)
+    .attr('width', totalW + 1000).attr('height', rulerH)
+    .attr('fill', '#0d1117');
+
+  // ── RULER TICKS ──
+  for (let yr = 1900; yr <= 2025; yr++) {
+    const x = (yr - minYear) * pxPerYear;
+    const isMajor = yr % 10 === 0;
+    const isMid = yr % 5 === 0;
+
+    if (isMajor) {
+      contentG.append('line')
+        .attr('x1', x).attr('y1', rulerH - 40)
+        .attr('x2', x).attr('y2', rulerH)
+        .attr('stroke', '#8b949e').attr('stroke-width', 1.5);
+    } else if (isMid) {
+      contentG.append('line')
+        .attr('x1', x).attr('y1', rulerH - 20)
+        .attr('x2', x).attr('y2', rulerH)
+        .attr('stroke', '#484f58').attr('stroke-width', 1);
+    } else {
+      contentG.append('line')
+        .attr('x1', x).attr('y1', rulerH - 10)
+        .attr('x2', x).attr('y2', rulerH)
+        .attr('stroke', '#30363d').attr('stroke-width', 0.5);
+    }
+  }
+
+  contentG.append('line')
+    .attr('x1', -500).attr('y1', rulerH)
+    .attr('x2', totalW + 500).attr('y2', rulerH)
+    .attr('stroke', '#30363d').attr('stroke-width', 1);
+
+  // ── YEAR LABELS (inverse-scaled) ──
+  yearLabelsG.selectAll('*').remove();
+  for (let yr = 1900; yr <= 2025; yr++) {
+    const x = (yr - minYear) * pxPerYear;
+    const isMajor = yr % 10 === 0;
+    const isMid = yr % 5 === 0;
+
+    if (isMajor) {
+      yearLabelsG.append('text')
+        .attr('x', x).attr('y', rulerH - 46)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', 'Inter, Helvetica, Arial, sans-serif')
+        .attr('font-size', '28px')
+        .attr('data-base-size', 28)
+        .attr('data-tier', 'major')
+        .attr('font-weight', '700')
+        .attr('fill', '#e6edf3')
+        .text(yr);
+    } else if (isMid) {
+      yearLabelsG.append('text')
+        .attr('x', x).attr('y', rulerH - 24)
+        .attr('text-anchor', 'middle')
+        .attr('font-family', 'Inter, Helvetica, Arial, sans-serif')
+        .attr('font-size', '13px')
+        .attr('data-base-size', 13)
+        .attr('data-tier', 'minor')
+        .attr('font-weight', '400')
+        .attr('fill', '#8b949e')
+        .text(yr);
+    }
+  }
+
+  // ── GRIDLINES ──
+  for (let yr = 1900; yr <= 2030; yr += 5) {
+    const x = (yr - minYear) * pxPerYear;
+    const isMajor = yr % 10 === 0;
+    contentG.append('line')
+      .attr('x1', x).attr('y1', rulerH)
+      .attr('x2', x).attr('y2', 8000)
+      .attr('stroke', isMajor ? '#21262d' : '#161b22')
+      .attr('stroke-width', isMajor ? 1 : 0.5);
+  }
+
+  // ── COLLECT & BIN-PACK ──
+  const allBars = nodes.map(n => {
+    const span = SPANS[n.id] || [assignEra(n.id), assignEra(n.id) + 5];
+    return { node: n, start: span[0], end: span[1] };
+  }).sort((a, b) => a.start - b.start || a.end - b.end);
+
+  const lanes = [];
+  allBars.forEach(bar => {
+    let placed = false;
+    for (let i = 0; i < lanes.length; i++) {
+      if (bar.start >= lanes[i]) {
+        lanes[i] = bar.end;
+        bar.lane = i;
+        placed = true;
+        break;
+      }
+    }
+    if (!placed) {
+      bar.lane = lanes.length;
+      lanes.push(bar.end);
+    }
+  });
+
+  // ── DRAW BARS ──
+
+  allBars.forEach(bar => {
+    const x1 = (bar.start - minYear) * pxPerYear;
+    const x2 = (bar.end - minYear) * pxPerYear;
+    const bw = Math.max(x2 - x1, pxPerYear * 2);
+    const by = rulerH + 12 + bar.lane * (trackH + trackGap);
+    const n = bar.node;
+    const fills = solidFills[n.category];
+
+    const barG = contentG.append('g').style('cursor', 'pointer');
+
+    // Solid bar
+    barG.append('rect')
+      .attr('x', x1).attr('y', by)
+      .attr('width', bw).attr('height', trackH)
+      .attr('rx', 6)
+      .attr('fill', fills.bg);
+
+    // Left accent stripe
+    barG.append('rect')
+      .attr('x', x1).attr('y', by)
+      .attr('width', 6).attr('height', trackH)
+      .attr('rx', 3)
+      .attr('fill', fills.accent);
+
+    // Clip path for bar label (clips text at bar's right edge)
+    const clipId = `cl${n.id.replace(/[^a-z0-9]/gi, '')}`;
+    contentG.append('clipPath').attr('id', clipId)
+      .append('rect')
+      .attr('x', x1).attr('y', by - trackH)
+      .attr('width', bw).attr('height', trackH * 3);
+
+    // Label — inverse-scaled, placed in barLabelsG, clipped to bar width
+    barLabelsG.append('text')
+      .attr('x', x1 + 14)
+      .attr('y', by + trackH / 2)
+      .attr('dominant-baseline', 'central')
+      .attr('font-family', 'Inter, Helvetica, Arial, sans-serif')
+      .attr('font-size', '16px')
+      .attr('data-base-size', 16)
+      .attr('font-weight', '500')
+      .attr('fill', '#e6edf3')
+      .attr('clip-path', `url(#${clipId})`)
+      .attr('pointer-events', 'none')
+      .text(n.label[currentLang]);
+
+    // Hover
+    barG.on('mouseover', function(event) {
+      d3.select(this).selectAll('rect').filter(function(d, i) { return i === 0; }).attr('fill', fills.hover);
+      tooltip.textContent = n.label[currentLang];
+      tooltip.classList.add('visible');
+      tooltip.style.left = (event.clientX + 14) + 'px';
+      tooltip.style.top = (event.clientY - 10) + 'px';
+    })
+    .on('mousemove', function(event) {
+      tooltip.style.left = (event.clientX + 14) + 'px';
+      tooltip.style.top = (event.clientY - 10) + 'px';
+    })
+    .on('mouseout', function() {
+      d3.select(this).selectAll('rect').filter(function(d, i) { return i === 0; }).attr('fill', fills.bg);
+      tooltip.classList.remove('visible');
+    });
+
+    barG.on('click', (event) => {
+      event.stopPropagation();
+      openPanel(n);
+    });
+  });
+
+  // Raise label groups above content so text paints on top of bars
+  yearLabelsG.raise();
+  barLabelsG.raise();
+
+  tlSvg.on('click', () => closePanel());
+}
+
+// ── View toggle ──
+window.setView = function(view) {
+  currentView = view;
+  document.getElementById('btn-graph').classList.toggle('active', view === 'graph');
+  document.getElementById('btn-timeline').classList.toggle('active', view === 'timeline');
+
+  const graphEl = document.getElementById('graph-container');
+  const tlEl = document.getElementById('timeline-container');
+  const legendEl = document.getElementById('legend');
+  const instrEl = document.getElementById('instructions');
+  const scrollHint = document.getElementById('scroll-hint');
+  const tlLegend = document.getElementById('tl-legend');
+
+  if (view === 'graph') {
+    graphEl.classList.remove('hidden');
+    tlEl.classList.remove('active');
+    legendEl.style.display = '';
+    scrollHint.style.display = 'none';
+    tlLegend.classList.remove('active');
+    simulation.alpha(0.1).restart();
+  } else {
+    graphEl.classList.add('hidden');
+    tlEl.classList.add('active');
+    legendEl.style.display = 'none';
+    if (instrEl) instrEl.style.display = 'none';
+    scrollHint.style.display = 'block';
+    tlLegend.classList.add('active');
+    // Update legend text for current language
+    tlLegend.querySelectorAll('[data-es]').forEach(el => {
+      el.textContent = el.getAttribute('data-' + currentLang);
+    });
+    buildTimeline();
+    setTimeout(() => { scrollHint.style.display = 'none'; }, 4000);
+  }
+
+  document.getElementById('btn-graph').textContent = currentLang === 'es' ? '⬡ Grafo' : '⬡ Graph';
+  document.getElementById('btn-timeline').textContent = currentLang === 'es' ? '▸ Línea' : '▸ Timeline';
+};
+
+// Patch setLang for timeline
+const origSetLang = window.setLang;
+window.setLang = function(lang) {
+  origSetLang(lang);
+  document.getElementById('btn-graph').textContent = lang === 'es' ? '⬡ Grafo' : '⬡ Graph';
+  document.getElementById('btn-timeline').textContent = lang === 'es' ? '▸ Línea' : '▸ Timeline';
+  document.getElementById('scroll-hint').textContent = lang === 'es'
+    ? '← Arrastra y usa scroll para zoom →'
+    : '← Drag and scroll to zoom →';
+  if (timelineBuilt) { timelineBuilt = false; buildTimeline(); }
+};
 </script>
 </body>
 </html>
