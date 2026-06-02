@@ -1,0 +1,1177 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mapa de Compatibilidad LLM · Grafo Interactivo</title>
+<meta name="description" content="Grafo interactivo del Mapa de Compatibilidad LLM: tareas, prompting, dinámicas de interacción, conceptos pedagógicos y perfiles de usuario.">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --bg-panel: #161b22;
+    --bg-panel-glass: rgba(22, 27, 34, 0.92);
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --text-muted: #484f58;
+    --framework: #bc8cff;
+    --framework-glow: rgba(188, 140, 255, 0.4);
+    --task: #f85149;
+    --task-glow: rgba(248, 81, 73, 0.4);
+    --prompting: #58a6ff;
+    --prompting-glow: rgba(88, 166, 255, 0.4);
+    --dynamic: #3fb950;
+    --dynamic-glow: rgba(63, 185, 80, 0.4);
+    --concept: #d29922;
+    --concept-glow: rgba(210, 153, 34, 0.4);
+    --user: #f778ba;
+    --user-glow: rgba(247, 120, 186, 0.4);
+    --link-color: rgba(139, 148, 158, 0.18);
+    --link-hover: rgba(139, 148, 158, 0.55);
+    --accent: #7c3aed;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  #graph-container {
+    width: 100%;
+    height: 100%;
+    position: absolute;
+    top: 0; left: 0;
+  }
+
+  svg { width: 100%; height: 100%; }
+
+  /* ─── Top bar ─── */
+  .top-bar {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 48px;
+    background: var(--bg-panel-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 20px;
+    z-index: 100;
+  }
+
+  .top-bar h1 {
+    font-size: 14px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--text);
+  }
+
+  .top-bar-controls {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .lang-toggle {
+    display: flex;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    overflow: hidden;
+  }
+
+  .lang-btn {
+    padding: 5px 14px;
+    font-size: 12px;
+    font-weight: 500;
+    font-family: 'Inter', sans-serif;
+    color: var(--text-dim);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: all 0.2s ease;
+  }
+
+  .lang-btn.active {
+    background: var(--accent);
+    color: #fff;
+  }
+
+  .node-count {
+    font-size: 11px;
+    color: var(--text-muted);
+    font-weight: 400;
+    letter-spacing: 0.02em;
+  }
+
+  /* ─── Legend ─── */
+  .legend {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    background: var(--bg-panel-glass);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 14px 18px;
+    z-index: 100;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: opacity 0.2s;
+  }
+
+  .legend-item:hover { opacity: 0.8; }
+
+  .legend-dot {
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    flex-shrink: 0;
+  }
+
+  /* ─── Detail Panel ─── */
+  .detail-panel {
+    position: fixed;
+    top: 48px;
+    right: 0;
+    width: 380px;
+    height: calc(100vh - 48px);
+    background: var(--bg-panel-glass);
+    backdrop-filter: blur(20px);
+    -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid var(--border);
+    z-index: 99;
+    transform: translateX(100%);
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto;
+    padding: 24px;
+  }
+
+  .detail-panel.open { transform: translateX(0); }
+
+  .detail-panel .close-btn {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    border: 1px solid var(--border);
+    background: var(--bg);
+    color: var(--text-dim);
+    font-size: 16px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.15s;
+  }
+
+  .detail-panel .close-btn:hover {
+    background: var(--border);
+    color: var(--text);
+  }
+
+  .detail-category {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 10px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    margin-bottom: 12px;
+  }
+
+  .detail-category.framework { background: var(--framework); color: #0d1117; }
+  .detail-category.task { background: var(--task); color: #fff; }
+  .detail-category.prompting { background: var(--prompting); color: #0d1117; }
+  .detail-category.dynamic { background: var(--dynamic); color: #0d1117; }
+  .detail-category.concept { background: var(--concept); color: #0d1117; }
+  .detail-category.user { background: var(--user); color: #0d1117; }
+
+  .detail-title {
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1.3;
+    margin-bottom: 16px;
+    color: var(--text);
+  }
+
+  .detail-description {
+    font-size: 13px;
+    line-height: 1.65;
+    color: var(--text-dim);
+    margin-bottom: 20px;
+  }
+
+  .detail-section-title {
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: var(--text-muted);
+    margin-bottom: 8px;
+  }
+
+  .detail-connections {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-bottom: 20px;
+  }
+
+  .detail-conn-chip {
+    padding: 4px 10px;
+    border-radius: 6px;
+    font-size: 11px;
+    font-weight: 500;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .detail-conn-chip:hover {
+    border-color: var(--accent);
+    color: var(--text);
+  }
+
+  /* ─── Search ─── */
+  .search-container {
+    position: relative;
+  }
+
+  .search-input {
+    width: 200px;
+    padding: 5px 12px 5px 28px;
+    font-size: 12px;
+    font-family: 'Inter', sans-serif;
+    color: var(--text);
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    outline: none;
+    transition: border-color 0.2s;
+  }
+
+  .search-input::placeholder { color: var(--text-muted); }
+  .search-input:focus { border-color: var(--accent); }
+
+  .search-icon {
+    position: absolute;
+    left: 9px;
+    top: 50%;
+    transform: translateY(-50%);
+    color: var(--text-muted);
+    font-size: 12px;
+    pointer-events: none;
+  }
+
+  /* ─── Tooltip ─── */
+  .tooltip {
+    position: fixed;
+    padding: 6px 12px;
+    background: var(--bg-panel);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--text);
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 200;
+    max-width: 260px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  .tooltip.visible { opacity: 1; }
+
+  /* ─── Instructions ─── */
+  .instructions {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    background: var(--bg-panel-glass);
+    backdrop-filter: blur(16px);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 12px 16px;
+    z-index: 100;
+    font-size: 11px;
+    color: var(--text-muted);
+    line-height: 1.6;
+    max-width: 220px;
+    transition: opacity 0.5s;
+  }
+
+  .instructions kbd {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 1px 5px;
+    font-family: 'Inter', sans-serif;
+    font-size: 10px;
+    color: var(--text-dim);
+  }
+
+  @media (max-width: 768px) {
+    .detail-panel { width: 100%; }
+    .search-input { width: 120px; }
+    .instructions { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <h1 id="main-title">Mapa de Compatibilidad LLM</h1>
+    <span class="node-count" id="node-count"></span>
+  </div>
+  <div class="top-bar-controls">
+    <div class="search-container">
+      <span class="search-icon">⌕</span>
+      <input type="text" class="search-input" id="search" placeholder="Buscar nodo...">
+    </div>
+    <div class="lang-toggle">
+      <button class="lang-btn active" id="btn-es" onclick="setLang('es')">ES</button>
+      <button class="lang-btn" id="btn-en" onclick="setLang('en')">EN</button>
+    </div>
+  </div>
+</div>
+
+<div class="legend" id="legend"></div>
+
+<div class="instructions" id="instructions">
+  <strong id="instr-title">Navegación</strong><br>
+  <span id="instr-drag">Arrastrar</span>: mover nodos<br>
+  <span id="instr-scroll">Scroll</span>: zoom<br>
+  <span id="instr-click">Clic</span>: ver ficha<br>
+  <span id="instr-hover">Hover</span>: resaltar conexiones
+</div>
+
+<div id="graph-container"></div>
+
+<div class="detail-panel" id="detail-panel">
+  <button class="close-btn" onclick="closePanel()">×</button>
+  <div id="detail-content"></div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// ═══════════════════════════════════════════
+// DATA — 35 nodes from LLM Compatibility Map
+// ═══════════════════════════════════════════
+
+const NODES = [
+  // ── FRAMEWORK (structural / meta concepts) ──
+  { id: "mapa-compatibilidad-llm", category: "framework",
+    label: { es: "Mapa de Compatibilidad LLM", en: "LLM Compatibility Map" },
+    desc: {
+      es: "Herramienta para pensar cómo elegir, probar y ubicar modelos de lenguaje según la tarea, la operación dominante, la dinámica de interacción y los riesgos de cada situación. El punto de entrada es la tarea, no el modelo.",
+      en: "Tool for thinking about how to choose, test, and place language models according to the task, dominant operation, interaction dynamic, and risks in each situation. The entry point is the task, not the model."
+    }},
+  { id: "taxonomia-tareas-llm", category: "framework",
+    label: { es: "Taxonomía de tareas LLM", en: "LLM Task Taxonomy" },
+    desc: {
+      es: "Organiza los tipos de trabajo que una persona puede intentar hacer con un modelo de lenguaje. Ayuda a reconocer qué operación domina, qué riesgo aparece si la tarea sale mal y qué tipo de dinámica conviene usar.",
+      en: "Organizes the kinds of work a person may try to do with a language model. Helps identify which operation dominates, what risk appears if the task goes wrong, and what kind of dynamic is worth using."
+    }},
+  { id: "seleccion-capacidad-vs-compatibilidad", category: "framework",
+    label: { es: "Selección: capacidad vs compatibilidad", en: "Selection: capability vs compatibility" },
+    desc: {
+      es: "La selección por capacidad mira lo que un modelo puede hacer en términos generales. La selección por compatibilidad agrega otra capa: cómo se comporta el modelo dentro de una forma concreta de trabajo.",
+      en: "Capability-based selection looks at what a model can do in general terms. Compatibility-based selection adds another layer: how the model behaves inside a concrete form of work."
+    }},
+  { id: "compatibilidad-usuario-tarea-dinamica", category: "framework",
+    label: { es: "Compatibilidad usuario-tarea-dinámica", en: "User-task-dynamic compatibility" },
+    desc: {
+      es: "Eje central del mapa. El rendimiento útil de un modelo no depende solo de lo que el modelo sabe hacer, sino de la relación entre la tarea, la dinámica de interacción y el patrón de usuario que aparece al repetir ese uso.",
+      en: "Central axis of the map. A model's useful performance depends not only on what it can do, but on the relation between the task, the interaction dynamic, and the user pattern that emerges from repeated use."
+    }},
+
+  // ── TASK FAMILIES ──
+  { id: "familia-coding", category: "task",
+    label: { es: "Familia: Coding", en: "Family: Coding" },
+    desc: {
+      es: "Convertir intención en procedimiento técnico, estructura ejecutable o sistema verificable. Incluye automatización, scripts, debugging, análisis documental estructurado, gráficos con código, dashboards y ofimática automatizada.",
+      en: "Turning intention into a technical procedure, executable structure, or verifiable system. Includes automation, scripts, debugging, structured document analysis, charts generated with code, dashboards, and automated office work."
+    }},
+  { id: "familia-research", category: "task",
+    label: { es: "Familia: Research", en: "Family: Research" },
+    desc: {
+      es: "Buscar, comparar, interpretar, sintetizar o adaptar información con trazabilidad. Incluye investigación, análisis documental, traducción/adaptación, escritura, enseñanza, síntesis y comparación de fuentes.",
+      en: "Searching, comparing, interpreting, synthesizing, or adapting information with traceability. Includes research, document analysis, translation/adaptation, writing, teaching, synthesis, and source comparison."
+    }},
+  { id: "familia-visual", category: "task",
+    label: { es: "Familia: Visual", en: "Family: Visual" },
+    desc: {
+      es: "Leer, crear, diseñar o componer material visual o multimodal. Incluye diseño, imágenes, diagramas, presentaciones, dashboards, gráficos, interfaces y expresión artística.",
+      en: "Reading, creating, designing, or composing visual or multimodal material. Includes design, images, diagrams, presentations, dashboards, charts, interfaces, and artistic expression."
+    }},
+  { id: "familia-sparring", category: "task",
+    label: { es: "Familia: Sparring", en: "Family: Sparring" },
+    desc: {
+      es: "Pensar con el modelo, tensionar ideas, planificar, conceptualizar o revisar criterio. Incluye enseñanza, aprendizaje, planificación, análisis, conceptualización, reflexión y escritura crítica.",
+      en: "Thinking with the model, tensioning ideas, planning, conceptualizing, or reviewing judgment. Includes teaching, learning, planning, analysis, conceptualization, reflection, and critical writing."
+    }},
+
+  // ── PROMPTING STYLES ──
+  { id: "prompting-transaccional", category: "prompting",
+    label: { es: "Prompting transaccional e instructivo", en: "Transactional & instructional prompting" },
+    desc: {
+      es: "Basado en formular una tarea clara, directa y de bajo margen de ambigüedad. Su fuerza está en reducir fricción: el usuario sabe lo que quiere y necesita que el modelo lo entregue de forma precisa.",
+      en: "Based on formulating a clear, direct task with low ambiguity. Its strength is reducing friction: the user knows what they want and needs the model to deliver it precisely."
+    }},
+  { id: "prompting-iterativo", category: "prompting",
+    label: { es: "Prompting iterativo", en: "Iterative prompting" },
+    desc: {
+      es: "Trabajar a través de versiones sucesivas. El usuario da una instrucción inicial, revisa la respuesta, da retroalimentación y pide ajustes específicos. Convierte el intercambio en un proceso de refinamiento sin perder dirección.",
+      en: "Working through successive versions. The user gives an initial instruction, reviews the response, gives feedback, and asks for specific adjustments. Turns the exchange into a refinement process without losing direction."
+    }},
+  { id: "prompting-exploratorio", category: "prompting",
+    label: { es: "Prompting exploratorio", en: "Exploratory prompting" },
+    desc: {
+      es: "Ocurre cuando el usuario aún no tiene una instrucción cerrada y usa el modelo para pensar, organizar, descubrir o formular mejor el problema. Su meta es encontrar estructura sin cierre prematuro.",
+      en: "Happens when the user does not yet have a fully closed instruction and uses the model to think, organize, discover, or formulate the problem better. Its goal is finding structure without premature closure."
+    }},
+  { id: "prompting-dialogico", category: "prompting",
+    label: { es: "Prompting dialógico", en: "Dialogic prompting" },
+    desc: {
+      es: "Estilo de prompting que busca sostener un intercambio donde el modelo no solo responde, sino que contribuye a desarrollar ideas, tensionar argumentos y mantener continuidad conceptual.",
+      en: "Prompting style that seeks to sustain an exchange where the model not only responds, but contributes to developing ideas, tensioning arguments, and maintaining conceptual continuity."
+    }},
+  { id: "prompting-orquestador", category: "prompting",
+    label: { es: "Prompting orquestador", en: "Orchestrating prompting" },
+    desc: {
+      es: "Coordinación de múltiples operaciones, herramientas o etapas dentro de un mismo flujo de trabajo. El usuario dirige y el modelo ejecuta dentro de un marco estructurado.",
+      en: "Coordination of multiple operations, tools, or stages within a single workflow. The user directs and the model executes within a structured frame."
+    }},
+  { id: "prompting-preservacion-editorial", category: "prompting",
+    label: { es: "Prompting de preservación editorial", en: "Editorial preservation prompting" },
+    desc: {
+      es: "Estilo de prompting que busca auditar, corregir o revisar material sin que el modelo reescriba, normalice o intervenga más allá de lo solicitado. Separa capas de intervención.",
+      en: "Prompting style that seeks to audit, correct, or review material without the model rewriting, normalizing, or intervening beyond what was requested. Separates intervention layers."
+    }},
+
+  // ── INTERACTION DYNAMICS ──
+  { id: "dinamica-transaccional", category: "dynamic",
+    label: { es: "Dinámica transaccional", en: "Transactional dynamic" },
+    desc: {
+      es: "El usuario formula una solicitud puntual y espera una respuesta directa. El intercambio se parece a una operación concreta: preguntar, recibir, usar o descartar.",
+      en: "The user makes a specific request and expects a direct answer. The exchange resembles a concrete operation: ask, receive, use, or discard."
+    }},
+  { id: "dinamica-delegativa", category: "dynamic",
+    label: { es: "Dinámica delegativa", en: "Delegative dynamic" },
+    desc: {
+      es: "El usuario entrega una tarea al modelo con la expectativa de recibir un resultado completo sin necesidad de supervisión paso a paso. Requiere confianza en que el modelo respetará restricciones.",
+      en: "The user hands a task to the model expecting a complete result without step-by-step supervision. Requires confidence that the model will respect constraints."
+    }},
+  { id: "dinamica-iterativa", category: "dynamic",
+    label: { es: "Dinámica iterativa", en: "Iterative dynamic" },
+    desc: {
+      es: "El usuario y el modelo trabajan por rondas sucesivas de ajuste. Cada respuesta se revisa, se corrige y se refina progresivamente hasta alcanzar el resultado deseado.",
+      en: "The user and model work through successive rounds of adjustment. Each response is reviewed, corrected, and progressively refined until the desired result is reached."
+    }},
+  { id: "dinamica-critica-auditora", category: "dynamic",
+    label: { es: "Dinámica crítica-auditora", en: "Critical-auditing dynamic" },
+    desc: {
+      es: "El usuario usa el modelo para revisar, detectar errores, verificar consistencia, comparar versiones o evaluar calidad. La función no es producir sino auditar.",
+      en: "The user uses the model to review, detect errors, verify consistency, compare versions, or evaluate quality. The function is not to produce but to audit."
+    }},
+  { id: "dinamica-dialogica-socratica", category: "dynamic",
+    label: { es: "Dinámica dialógica-socrática", en: "Dialogic-Socratic dynamic" },
+    desc: {
+      es: "El modelo funciona como contraparte de pensamiento. El intercambio busca desarrollar ideas, tensionar argumentos, detectar huecos y sostener un proceso de reflexión conjunto.",
+      en: "The model functions as a thinking counterpart. The exchange seeks to develop ideas, tension arguments, detect gaps, and sustain a joint reflection process."
+    }},
+  { id: "dinamica-orquestadora", category: "dynamic",
+    label: { es: "Dinámica orquestadora", en: "Orchestrating dynamic" },
+    desc: {
+      es: "El usuario dirige un proceso con múltiples pasos, herramientas o agentes coordinados. El modelo ejecuta dentro de un marco que el usuario estructura y supervisa.",
+      en: "The user directs a process with multiple steps, tools, or coordinated agents. The model executes within a frame that the user structures and supervises."
+    }},
+  { id: "dinamica-relacional-continuidad", category: "dynamic",
+    label: { es: "Dinámica relacional-de continuidad", en: "Relational-continuity dynamic" },
+    desc: {
+      es: "El usuario necesita que el modelo mantenga memoria, contexto y criterios a lo largo de múltiples sesiones o intercambios largos. La continuidad es parte del valor.",
+      en: "The user needs the model to maintain memory, context, and criteria across multiple sessions or long exchanges. Continuity is part of the value."
+    }},
+
+  // ── PEDAGOGICAL CONCEPTS ──
+  { id: "preservacion-voz", category: "concept",
+    label: { es: "Preservación de voz", en: "Voice preservation" },
+    desc: {
+      es: "Capacidad de trabajar con un modelo sin que el texto, tono o postura del usuario sea absorbido en una voz genérica. Incluye la no-normalización editorial: el modelo no debe suavizar, profesionalizar ni domesticar una voz situada si esa intervención no fue solicitada.",
+      en: "Ability to work with a model without having the user's text, tone, or stance absorbed into a generic voice. Includes editorial non-normalization: the model should not soften, professionalize, or domesticate a situated voice if that intervention was not requested."
+    }},
+  { id: "drift-tolerancia", category: "concept",
+    label: { es: "Drift y tolerancia al drift", en: "Drift & drift tolerance" },
+    desc: {
+      es: "Drift es el movimiento gradual del comportamiento del modelo fuera del marco de trabajo acordado. Puede aparecer como pérdida de instrucciones, cambio de tono, producción prematura, olvido de restricciones o retorno a respuestas genéricas.",
+      en: "Drift is the gradual movement of model behavior away from the agreed work frame. It can appear as loss of instructions, change of tone, premature production, forgotten constraints, or return to generic answers."
+    }},
+  { id: "sparring-partner", category: "concept",
+    label: { es: "Sparring partner como modo de uso", en: "Sparring partner as mode of use" },
+    desc: {
+      es: "Usar un modelo como contraparte de pensamiento: no solo para generar respuestas, sino para discutir ideas, detectar huecos, formular objeciones, comparar marcos y tensionar argumentos. El modelo no reemplaza la autoría.",
+      en: "Using a model as a counterpart for thought: not only to generate answers, but to discuss ideas, detect gaps, formulate objections, compare frames, and tension arguments. The model does not replace authorship."
+    }},
+  { id: "evaluacion-situada", category: "concept",
+    label: { es: "Evaluación situada de plataformas", en: "Situated platform evaluation" },
+    desc: {
+      es: "Un modelo no debe evaluarse solamente por sus capacidades generales, sino por cómo funciona dentro de un contexto concreto de uso. Un modelo fuerte en benchmarks puede no ser adecuado para quien necesita continuidad, preservación de voz o trabajo conceptual de largo aliento.",
+      en: "A model should not be evaluated only by its general capabilities, but by how it functions within a concrete use context. A model strong in benchmarks may not fit someone who needs continuity, voice preservation, or long-range conceptual work."
+    }},
+  { id: "benchmarks-limitaciones", category: "concept",
+    label: { es: "Benchmarks: panorama y limitaciones", en: "Benchmarks: overview & limitations" },
+    desc: {
+      es: "Pruebas estandarizadas para comparar modelos según ciertas capacidades. Sirven como puntos de referencia pero no capturan compatibilidad con formas específicas de trabajo, voz, continuidad o dinámicas complejas.",
+      en: "Standardized tests for comparing models along certain capabilities. They serve as reference points but do not capture compatibility with specific work forms, voice, continuity, or complex dynamics."
+    }},
+  { id: "tradeoffs-seleccion", category: "concept",
+    label: { es: "Trade-offs en selección de modelos", en: "Trade-offs in model selection" },
+    desc: {
+      es: "Seleccionar un modelo implica trabajar con trade-offs: mejoras en una dimensión pueden venir con costos en otra. Un modelo más capaz puede ser más lento, más caro o más pesado de operar.",
+      en: "Selecting a model involves working with trade-offs: improvements in one dimension may come with costs in another. A more capable model may be slower, more expensive, or heavier to operate."
+    }},
+  { id: "higiene-cognitiva-multimodelo", category: "concept",
+    label: { es: "Higiene cognitiva multi-modelo", en: "Multi-model cognitive hygiene" },
+    desc: {
+      es: "Práctica de usar más de un modelo o plataforma para introducir contraste, fricción y triangulación. Evita que una sola plataforma defina silenciosamente el tono, los criterios y los límites del proceso.",
+      en: "Practice of using more than one model or platform to introduce contrast, friction, and triangulation. Prevents a single platform from silently defining the tone, criteria, and limits of the process."
+    }},
+  { id: "prompt-engineering", category: "concept",
+    label: { es: "Prompt engineering", en: "Prompt engineering" },
+    desc: {
+      es: "Práctica de diseñar instrucciones para obtener mejores respuestas de un modelo de lenguaje. Incluye formular tareas con claridad, entregar contexto, especificar formato, definir restricciones y ajustar según resultado.",
+      en: "Practice of designing instructions to get better responses from a language model. Includes formulating tasks clearly, delivering context, specifying format, defining constraints, and adjusting based on results."
+    }},
+  { id: "context-engineering", category: "concept",
+    label: { es: "Context engineering", en: "Context engineering" },
+    desc: {
+      es: "Práctica de diseñar el entorno de información en el que opera un modelo. Implica decidir qué contexto entra, en qué orden, con qué formato, qué memoria se usa, qué herramientas están conectadas y qué restricciones se aplican.",
+      en: "Practice of designing the information environment in which a model operates. Involves deciding what context enters, in what order, with what format, what memory is used, what tools are connected, and what constraints apply."
+    }},
+  { id: "prompt-vs-context-engineering", category: "concept",
+    label: { es: "Prompt eng. vs context eng.", en: "Prompt eng. vs context eng." },
+    desc: {
+      es: "Prompt engineering se enfoca en cómo se formula una instrucción. Context engineering se enfoca en qué ambiente de información, memoria, herramientas y restricciones rodea esa instrucción. Ambos importan pero resuelven problemas distintos.",
+      en: "Prompt engineering focuses on how an instruction is formulated. Context engineering focuses on what information environment, memory, tools, and constraints surround that instruction. Both matter but solve different problems."
+    }},
+
+  // ── USER PROFILES ──
+  { id: "usuario-transaccional", category: "user",
+    label: { es: "Usuario transaccional", en: "Transactional user" },
+    desc: {
+      es: "Usa el modelo para resolver una solicitud puntual con la menor fricción posible. No busca conversación larga ni exploración, sino una respuesta directa y utilizable.",
+      en: "Uses the model to resolve a specific request with as little friction as possible. Not looking for long conversation or exploration, but a direct and usable response."
+    }},
+  { id: "usuario-ejecutivo", category: "user",
+    label: { es: "Usuario ejecutivo-ofimático", en: "Executive-office user" },
+    desc: {
+      es: "Usa el modelo para organizar, resumir, redactar, calendarizar, priorizar y estructurar información. Sus tareas incluyen correos, minutas, tablas, reportes, planes y agendas.",
+      en: "Uses the model to organize, summarize, draft, schedule, prioritize, and structure information. Tasks include emails, minutes, tables, reports, plans, and agendas."
+    }},
+  { id: "usuario-productor-artifacts", category: "user",
+    label: { es: "Usuario productor de artifacts", en: "Artifact-producing user" },
+    desc: {
+      es: "Usa el modelo para crear salidas concretas, portables y reutilizables: documentos, presentaciones, tablas, scripts, plantillas, resúmenes, guías y archivos estructurados.",
+      en: "Uses the model to create concrete, portable, and reusable outputs: documents, presentations, tables, scripts, templates, summaries, guides, and structured files."
+    }},
+  { id: "usuario-multimodal-visual", category: "user",
+    label: { es: "Usuario multimodal-visual", en: "Multimodal-visual user" },
+    desc: {
+      es: "Trabaja con imágenes, capturas de pantalla, gráficos, PDFs, diagramas, mapas, interfaces, bocetos, presentaciones o materiales visuales.",
+      en: "Works with images, screenshots, charts, PDFs, diagrams, maps, interfaces, sketches, presentations, or visual materials."
+    }},
+  { id: "usuario-tecnico-coding", category: "user",
+    label: { es: "Usuario técnico / coding", en: "Technical / coding user" },
+    desc: {
+      es: "Usa el modelo para escribir, revisar, explicar, depurar o estructurar código. También para entender errores, leer logs, diseñar arquitectura, crear scripts y trabajar con APIs.",
+      en: "Uses the model to write, review, explain, debug, or structure code. Also to understand errors, read logs, design architecture, create scripts, and work with APIs."
+    }},
+  { id: "usuario-investigador", category: "user",
+    label: { es: "Usuario investigador", en: "Researcher user" },
+    desc: {
+      es: "Usa el modelo para buscar, organizar, comparar, sintetizar y tensionar información. Necesita trazabilidad, precisión y cautela metodológica más que respuestas convincentes.",
+      en: "Uses the model to search, organize, compare, synthesize, and tension information. Needs traceability, precision, and methodological caution more than convincing answers."
+    }},
+  { id: "usuario-creativo-editorial", category: "user",
+    label: { es: "Usuario creativo-editorial", en: "Creative-editorial user" },
+    desc: {
+      es: "Trabaja con escritura, voz, tono, estilo, traducción, adaptación cultural, registro, estructura narrativa, formulación pública o desarrollo conceptual.",
+      en: "Works with writing, voice, tone, style, translation, cultural adaptation, register, narrative structure, public formulation, or conceptual development."
+    }},
+  { id: "usuario-dialogico-alta-densidad", category: "user",
+    label: { es: "Usuario dialógico de alta densidad", en: "High-context dialogic user" },
+    desc: {
+      es: "Usa el modelo como contraparte para pensar, desarrollar ideas, conectar capas de información, tensionar argumentos y sostener procesos de trabajo que no empiezan con una instrucción cerrada.",
+      en: "Uses the model as a counterpart for thinking, developing ideas, connecting information layers, tensioning arguments, and sustaining work processes that don't start with a closed instruction."
+    }}
+];
+
+// ── LINKS (extracted from Suggested Routes / Rutas sugeridas in each file) ──
+const LINK_DATA = [
+  // Map hub connections
+  ["mapa-compatibilidad-llm","taxonomia-tareas-llm"],
+  ["mapa-compatibilidad-llm","seleccion-capacidad-vs-compatibilidad"],
+  ["mapa-compatibilidad-llm","compatibilidad-usuario-tarea-dinamica"],
+  ["mapa-compatibilidad-llm","evaluacion-situada"],
+  // Taxonomy → task families
+  ["taxonomia-tareas-llm","familia-coding"],
+  ["taxonomia-tareas-llm","familia-research"],
+  ["taxonomia-tareas-llm","familia-visual"],
+  ["taxonomia-tareas-llm","familia-sparring"],
+  ["taxonomia-tareas-llm","seleccion-capacidad-vs-compatibilidad"],
+  ["taxonomia-tareas-llm","compatibilidad-usuario-tarea-dinamica"],
+  // Selection → evaluation concepts
+  ["seleccion-capacidad-vs-compatibilidad","evaluacion-situada"],
+  ["seleccion-capacidad-vs-compatibilidad","compatibilidad-usuario-tarea-dinamica"],
+  ["seleccion-capacidad-vs-compatibilidad","benchmarks-limitaciones"],
+  ["seleccion-capacidad-vs-compatibilidad","tradeoffs-seleccion"],
+  ["seleccion-capacidad-vs-compatibilidad","drift-tolerancia"],
+  ["seleccion-capacidad-vs-compatibilidad","preservacion-voz"],
+  // Compatibility hub
+  ["compatibilidad-usuario-tarea-dinamica","evaluacion-situada"],
+  ["compatibilidad-usuario-tarea-dinamica","usuario-transaccional"],
+  ["compatibilidad-usuario-tarea-dinamica","usuario-dialogico-alta-densidad"],
+  ["compatibilidad-usuario-tarea-dinamica","dinamica-dialogica-socratica"],
+  ["compatibilidad-usuario-tarea-dinamica","prompting-orquestador"],
+  ["compatibilidad-usuario-tarea-dinamica","sparring-partner"],
+  // Transactional prompting
+  ["prompting-transaccional","dinamica-transaccional"],
+  ["prompting-transaccional","dinamica-delegativa"],
+  ["prompting-transaccional","usuario-transaccional"],
+  ["prompting-transaccional","usuario-ejecutivo"],
+  ["prompting-transaccional","usuario-productor-artifacts"],
+  ["prompting-transaccional","taxonomia-tareas-llm"],
+  // Iterative prompting
+  ["prompting-iterativo","dinamica-iterativa"],
+  ["prompting-iterativo","usuario-productor-artifacts"],
+  ["prompting-iterativo","usuario-creativo-editorial"],
+  ["prompting-iterativo","drift-tolerancia"],
+  ["prompting-iterativo","preservacion-voz"],
+  // Exploratory prompting
+  ["prompting-exploratorio","usuario-dialogico-alta-densidad"],
+  ["prompting-exploratorio","dinamica-dialogica-socratica"],
+  ["prompting-exploratorio","prompting-dialogico"],
+  ["prompting-exploratorio","sparring-partner"],
+  ["prompting-exploratorio","dinamica-orquestadora"],
+  // Dialogic prompting
+  ["prompting-dialogico","dinamica-dialogica-socratica"],
+  ["prompting-dialogico","dinamica-relacional-continuidad"],
+  ["prompting-dialogico","sparring-partner"],
+  ["prompting-dialogico","usuario-dialogico-alta-densidad"],
+  // Orchestrating prompting
+  ["prompting-orquestador","dinamica-orquestadora"],
+  ["prompting-orquestador","dinamica-iterativa"],
+  ["prompting-orquestador","context-engineering"],
+  ["prompting-orquestador","familia-coding"],
+  // Editorial preservation prompting
+  ["prompting-preservacion-editorial","dinamica-critica-auditora"],
+  ["prompting-preservacion-editorial","dinamica-iterativa"],
+  ["prompting-preservacion-editorial","preservacion-voz"],
+  ["prompting-preservacion-editorial","usuario-creativo-editorial"],
+  ["prompting-preservacion-editorial","usuario-investigador"],
+  // Transactional dynamic
+  ["dinamica-transaccional","usuario-transaccional"],
+  ["dinamica-transaccional","usuario-ejecutivo"],
+  ["dinamica-transaccional","seleccion-capacidad-vs-compatibilidad"],
+  // Delegative dynamic
+  ["dinamica-delegativa","usuario-transaccional"],
+  ["dinamica-delegativa","usuario-ejecutivo"],
+  ["dinamica-delegativa","usuario-productor-artifacts"],
+  // Iterative dynamic
+  ["dinamica-iterativa","usuario-productor-artifacts"],
+  ["dinamica-iterativa","usuario-creativo-editorial"],
+  ["dinamica-iterativa","usuario-tecnico-coding"],
+  ["dinamica-iterativa","drift-tolerancia"],
+  // Critical-auditing dynamic
+  ["dinamica-critica-auditora","usuario-investigador"],
+  ["dinamica-critica-auditora","usuario-creativo-editorial"],
+  ["dinamica-critica-auditora","preservacion-voz"],
+  ["dinamica-critica-auditora","sparring-partner"],
+  // Dialogic-Socratic dynamic
+  ["dinamica-dialogica-socratica","usuario-dialogico-alta-densidad"],
+  ["dinamica-dialogica-socratica","usuario-investigador"],
+  ["dinamica-dialogica-socratica","sparring-partner"],
+  ["dinamica-dialogica-socratica","preservacion-voz"],
+  // Orchestrating dynamic
+  ["dinamica-orquestadora","usuario-tecnico-coding"],
+  ["dinamica-orquestadora","context-engineering"],
+  ["dinamica-orquestadora","drift-tolerancia"],
+  // Relational-continuity dynamic
+  ["dinamica-relacional-continuidad","usuario-dialogico-alta-densidad"],
+  ["dinamica-relacional-continuidad","drift-tolerancia"],
+  ["dinamica-relacional-continuidad","preservacion-voz"],
+  ["dinamica-relacional-continuidad","sparring-partner"],
+  // Voice preservation
+  ["preservacion-voz","usuario-creativo-editorial"],
+  ["preservacion-voz","usuario-dialogico-alta-densidad"],
+  ["preservacion-voz","drift-tolerancia"],
+  ["preservacion-voz","higiene-cognitiva-multimodelo"],
+  // Drift
+  ["drift-tolerancia","dinamica-relacional-continuidad"],
+  ["drift-tolerancia","higiene-cognitiva-multimodelo"],
+  ["drift-tolerancia","context-engineering"],
+  // Sparring partner
+  ["sparring-partner","usuario-dialogico-alta-densidad"],
+  ["sparring-partner","usuario-investigador"],
+  ["sparring-partner","usuario-creativo-editorial"],
+  ["sparring-partner","higiene-cognitiva-multimodelo"],
+  // Situated evaluation
+  ["evaluacion-situada","benchmarks-limitaciones"],
+  ["evaluacion-situada","tradeoffs-seleccion"],
+  // Benchmarks
+  ["benchmarks-limitaciones","tradeoffs-seleccion"],
+  // Trade-offs
+  ["tradeoffs-seleccion","usuario-tecnico-coding"],
+  ["tradeoffs-seleccion","usuario-multimodal-visual"],
+  // Cognitive hygiene
+  ["higiene-cognitiva-multimodelo","context-engineering"],
+  // Prompt engineering concepts
+  ["prompt-engineering","context-engineering"],
+  ["prompt-engineering","prompt-vs-context-engineering"],
+  ["context-engineering","prompt-vs-context-engineering"],
+  // Coding family connections
+  ["familia-coding","prompting-transaccional"],
+  ["familia-coding","prompting-iterativo"],
+  ["familia-coding","prompting-orquestador"],
+  ["familia-coding","dinamica-iterativa"],
+  ["familia-coding","dinamica-critica-auditora"],
+  ["familia-coding","usuario-tecnico-coding"],
+  // Research family connections
+  ["familia-research","prompting-exploratorio"],
+  ["familia-research","prompting-dialogico"],
+  ["familia-research","prompting-preservacion-editorial"],
+  ["familia-research","dinamica-critica-auditora"],
+  ["familia-research","dinamica-dialogica-socratica"],
+  ["familia-research","usuario-investigador"],
+  ["familia-research","usuario-creativo-editorial"],
+  // Visual family connections
+  ["familia-visual","prompting-transaccional"],
+  ["familia-visual","prompting-iterativo"],
+  ["familia-visual","prompting-orquestador"],
+  ["familia-visual","usuario-multimodal-visual"],
+  ["familia-visual","usuario-productor-artifacts"],
+  // Sparring family connections
+  ["familia-sparring","prompting-exploratorio"],
+  ["familia-sparring","prompting-dialogico"],
+  ["familia-sparring","prompting-preservacion-editorial"],
+  ["familia-sparring","dinamica-dialogica-socratica"],
+  ["familia-sparring","dinamica-critica-auditora"],
+  ["familia-sparring","dinamica-relacional-continuidad"],
+  ["familia-sparring","sparring-partner"],
+  ["familia-sparring","usuario-dialogico-alta-densidad"],
+  // User profile cross-links
+  ["usuario-transaccional","tradeoffs-seleccion"],
+  ["usuario-investigador","evaluacion-situada"],
+  ["usuario-creativo-editorial","preservacion-voz"],
+  ["usuario-tecnico-coding","context-engineering"],
+  ["usuario-multimodal-visual","evaluacion-situada"],
+  ["usuario-dialogico-alta-densidad","dinamica-relacional-continuidad"],
+];
+
+// ═══════════════════════════════════════════
+// BUILD GRAPH
+// ═══════════════════════════════════════════
+
+let currentLang = 'es';
+const nodeMap = new Map(NODES.map(n => [n.id, n]));
+const validIds = new Set(NODES.map(n => n.id));
+
+// Filter links to only valid node pairs
+const links = LINK_DATA
+  .filter(([s,t]) => validIds.has(s) && validIds.has(t))
+  .map(([source, target]) => ({ source, target }));
+
+// Deduplicate links
+const linkSet = new Set();
+const dedupedLinks = [];
+for (const l of links) {
+  const key = [l.source, l.target].sort().join('||');
+  if (!linkSet.has(key)) {
+    linkSet.add(key);
+    dedupedLinks.push(l);
+  }
+}
+
+const nodes = NODES.map(n => ({ ...n }));
+
+const categoryColors = {
+  framework: { fill: '#bc8cff', glow: 'rgba(188,140,255,0.5)' },
+  task:      { fill: '#f85149', glow: 'rgba(248,81,73,0.5)' },
+  prompting: { fill: '#58a6ff', glow: 'rgba(88,166,255,0.5)' },
+  dynamic:   { fill: '#3fb950', glow: 'rgba(63,185,80,0.5)' },
+  concept:   { fill: '#d29922', glow: 'rgba(210,153,34,0.5)' },
+  user:      { fill: '#f778ba', glow: 'rgba(247,120,186,0.5)' }
+};
+
+const categoryLabels = {
+  framework: { es: 'Marco', en: 'Framework' },
+  task:      { es: 'Familias de tarea', en: 'Task families' },
+  prompting: { es: 'Estilos de prompting', en: 'Prompting styles' },
+  dynamic:   { es: 'Dinámicas', en: 'Dynamics' },
+  concept:   { es: 'Conceptos', en: 'Concepts' },
+  user:      { es: 'Perfiles de usuario', en: 'User profiles' }
+};
+
+const nodeRadius = d => d.category === 'framework' ? 9 : d.category === 'task' ? 7 : 5;
+
+// ── Setup SVG ──
+const container = document.getElementById('graph-container');
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+const svg = d3.select(container).append('svg')
+  .attr('width', width)
+  .attr('height', height);
+
+// Glow filter
+const defs = svg.append('defs');
+Object.entries(categoryColors).forEach(([cat, colors]) => {
+  const filter = defs.append('filter').attr('id', `glow-${cat}`);
+  filter.append('feGaussianBlur').attr('stdDeviation', 4).attr('result', 'blur');
+  filter.append('feFlood').attr('flood-color', colors.glow).attr('result', 'color');
+  filter.append('feComposite').attr('in', 'color').attr('in2', 'blur').attr('operator', 'in').attr('result', 'colorBlur');
+  const merge = filter.append('feMerge');
+  merge.append('feMergeNode').attr('in', 'colorBlur');
+  merge.append('feMergeNode').attr('in', 'SourceGraphic');
+});
+
+const g = svg.append('g');
+
+// Zoom
+const zoom = d3.zoom()
+  .scaleExtent([0.15, 4])
+  .on('zoom', e => g.attr('transform', e.transform));
+svg.call(zoom);
+
+// Simulation
+const simulation = d3.forceSimulation(nodes)
+  .force('link', d3.forceLink(dedupedLinks).id(d => d.id).distance(90).strength(0.25))
+  .force('charge', d3.forceManyBody().strength(-280))
+  .force('center', d3.forceCenter(width / 2, height / 2))
+  .force('collision', d3.forceCollide().radius(d => nodeRadius(d) + 14))
+  .force('x', d3.forceX(width / 2).strength(0.03))
+  .force('y', d3.forceY(height / 2).strength(0.03));
+
+// Links
+const linkGroup = g.append('g').attr('class', 'links');
+const link = linkGroup.selectAll('line')
+  .data(dedupedLinks)
+  .join('line')
+  .attr('stroke', 'rgba(139,148,158,0.15)')
+  .attr('stroke-width', 0.8);
+
+// Nodes
+const nodeGroup = g.append('g').attr('class', 'nodes');
+const node = nodeGroup.selectAll('g')
+  .data(nodes)
+  .join('g')
+  .attr('cursor', 'pointer')
+  .call(d3.drag()
+    .on('start', dragstarted)
+    .on('drag', dragged)
+    .on('end', dragended));
+
+node.append('circle')
+  .attr('r', nodeRadius)
+  .attr('fill', d => categoryColors[d.category].fill)
+  .attr('filter', d => `url(#glow-${d.category})`)
+  .attr('stroke', 'none')
+  .attr('opacity', 0.9);
+
+// Labels
+const labels = node.append('text')
+  .attr('dx', d => nodeRadius(d) + 4)
+  .attr('dy', '0.35em')
+  .attr('font-size', d => d.category === 'framework' ? '9px' : '8px')
+  .attr('font-family', 'Inter, sans-serif')
+  .attr('font-weight', d => d.category === 'framework' ? 500 : 400)
+  .attr('fill', 'rgba(230,237,243,0.7)')
+  .attr('pointer-events', 'none')
+  .text(d => d.label[currentLang]);
+
+// ── Interactions ──
+const tooltip = document.getElementById('tooltip');
+const detailPanel = document.getElementById('detail-panel');
+const detailContent = document.getElementById('detail-content');
+
+// Hover
+node.on('mouseover', function(event, d) {
+  const connected = new Set();
+  dedupedLinks.forEach(l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sid === d.id) connected.add(tid);
+    if (tid === d.id) connected.add(sid);
+  });
+  connected.add(d.id);
+
+  node.select('circle')
+    .attr('opacity', n => connected.has(n.id) ? 1 : 0.12);
+  labels
+    .attr('fill', n => connected.has(n.id) ? 'rgba(230,237,243,0.9)' : 'rgba(230,237,243,0.1)');
+  link
+    .attr('stroke', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return (sid === d.id || tid === d.id) ? 'rgba(139,148,158,0.55)' : 'rgba(139,148,158,0.04)';
+    })
+    .attr('stroke-width', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return (sid === d.id || tid === d.id) ? 1.5 : 0.5;
+    });
+
+  tooltip.textContent = d.label[currentLang];
+  tooltip.classList.add('visible');
+  tooltip.style.left = (event.clientX + 14) + 'px';
+  tooltip.style.top = (event.clientY - 10) + 'px';
+})
+.on('mousemove', function(event) {
+  tooltip.style.left = (event.clientX + 14) + 'px';
+  tooltip.style.top = (event.clientY - 10) + 'px';
+})
+.on('mouseout', function() {
+  node.select('circle').attr('opacity', 0.9);
+  labels.attr('fill', 'rgba(230,237,243,0.7)');
+  link.attr('stroke', 'rgba(139,148,158,0.15)').attr('stroke-width', 0.8);
+  tooltip.classList.remove('visible');
+});
+
+// Click → detail panel
+node.on('click', function(event, d) {
+  event.stopPropagation();
+  openPanel(d);
+});
+
+svg.on('click', () => closePanel());
+
+function openPanel(d) {
+  const connections = [];
+  dedupedLinks.forEach(l => {
+    const sid = typeof l.source === 'object' ? l.source.id : l.source;
+    const tid = typeof l.target === 'object' ? l.target.id : l.target;
+    if (sid === d.id && nodeMap.has(tid)) connections.push(nodeMap.get(tid));
+    if (tid === d.id && nodeMap.has(sid)) connections.push(nodeMap.get(sid));
+  });
+
+  const catLabel = categoryLabels[d.category][currentLang];
+  const connChips = connections.map(c =>
+    `<span class="detail-conn-chip" onclick="navigateTo('${c.id}')">${c.label[currentLang]}</span>`
+  ).join('');
+
+  const sectionTitle = {
+    connections: { es: 'Conexiones', en: 'Connections' },
+  };
+
+  detailContent.innerHTML = `
+    <span class="detail-category ${d.category}">${catLabel}</span>
+    <h2 class="detail-title">${d.label[currentLang]}</h2>
+    <p class="detail-description">${d.desc[currentLang]}</p>
+    ${connections.length ? `
+      <p class="detail-section-title">${sectionTitle.connections[currentLang]} (${connections.length})</p>
+      <div class="detail-connections">${connChips}</div>
+    ` : ''}
+  `;
+  detailPanel.classList.add('open');
+}
+
+function closePanel() {
+  detailPanel.classList.remove('open');
+}
+
+window.navigateTo = function(id) {
+  const n = nodeMap.get(id);
+  if (n) {
+    const nodeData = nodes.find(nd => nd.id === id);
+    if (nodeData) openPanel(nodeData);
+  }
+};
+
+// ── Tick ──
+simulation.on('tick', () => {
+  link
+    .attr('x1', d => d.source.x)
+    .attr('y1', d => d.source.y)
+    .attr('x2', d => d.target.x)
+    .attr('y2', d => d.target.y);
+
+  node.attr('transform', d => `translate(${d.x},${d.y})`);
+});
+
+function dragstarted(event, d) {
+  if (!event.active) simulation.alphaTarget(0.3).restart();
+  d.fx = d.x; d.fy = d.y;
+}
+function dragged(event, d) {
+  d.fx = event.x; d.fy = event.y;
+}
+function dragended(event, d) {
+  if (!event.active) simulation.alphaTarget(0);
+  d.fx = null; d.fy = null;
+}
+
+// ── Legend ──
+function renderLegend() {
+  const legend = document.getElementById('legend');
+  const cats = ['framework','task','prompting','dynamic','concept','user'];
+  const counts = {};
+  cats.forEach(c => counts[c] = nodes.filter(n => n.category === c).length);
+
+  legend.innerHTML = cats.map(c => `
+    <div class="legend-item">
+      <span class="legend-dot" style="background:${categoryColors[c].fill};box-shadow:0 0 6px ${categoryColors[c].glow}"></span>
+      <span>${categoryLabels[c][currentLang]} (${counts[c]})</span>
+    </div>
+  `).join('');
+}
+renderLegend();
+
+// ── Node count ──
+document.getElementById('node-count').textContent = `${nodes.length} nodos · ${dedupedLinks.length} conexiones`;
+
+// ── Search ──
+const searchInput = document.getElementById('search');
+searchInput.addEventListener('input', function() {
+  const q = this.value.toLowerCase().trim();
+  if (!q) {
+    node.select('circle').attr('opacity', 0.9);
+    labels.attr('fill', 'rgba(230,237,243,0.7)');
+    link.attr('stroke', 'rgba(139,148,158,0.15)').attr('stroke-width', 0.8);
+    return;
+  }
+
+  const matches = new Set();
+  nodes.forEach(n => {
+    if (n.label[currentLang].toLowerCase().includes(q) || n.id.includes(q)) {
+      matches.add(n.id);
+    }
+  });
+
+  node.select('circle').attr('opacity', n => matches.has(n.id) ? 1 : 0.08);
+  labels.attr('fill', n => matches.has(n.id) ? '#fff' : 'rgba(230,237,243,0.08)');
+
+  if (matches.size === 1) {
+    const matchId = [...matches][0];
+    const connected = new Set([matchId]);
+    dedupedLinks.forEach(l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      if (sid === matchId) connected.add(tid);
+      if (tid === matchId) connected.add(sid);
+    });
+    node.select('circle').attr('opacity', n => connected.has(n.id) ? 1 : 0.08);
+    labels.attr('fill', n => connected.has(n.id) ? 'rgba(230,237,243,0.9)' : 'rgba(230,237,243,0.08)');
+    link.attr('stroke', l => {
+      const sid = typeof l.source === 'object' ? l.source.id : l.source;
+      const tid = typeof l.target === 'object' ? l.target.id : l.target;
+      return (sid === matchId || tid === matchId) ? 'rgba(139,148,158,0.55)' : 'rgba(139,148,158,0.03)';
+    });
+  }
+});
+
+// ── Language toggle ──
+window.setLang = function(lang) {
+  currentLang = lang;
+  document.getElementById('btn-es').classList.toggle('active', lang === 'es');
+  document.getElementById('btn-en').classList.toggle('active', lang === 'en');
+
+  // Update labels
+  labels.text(d => d.label[currentLang]);
+
+  // Update title
+  document.getElementById('main-title').textContent =
+    lang === 'es' ? 'Mapa de Compatibilidad LLM' : 'LLM Compatibility Map';
+
+  // Update node count
+  document.getElementById('node-count').textContent =
+    lang === 'es'
+      ? `${nodes.length} nodos · ${dedupedLinks.length} conexiones`
+      : `${nodes.length} nodes · ${dedupedLinks.length} connections`;
+
+  // Update search placeholder
+  searchInput.placeholder = lang === 'es' ? 'Buscar nodo...' : 'Search node...';
+
+  // Update legend
+  renderLegend();
+
+  // Update instructions
+  document.getElementById('instr-title').textContent = lang === 'es' ? 'Navegación' : 'Navigation';
+  document.getElementById('instr-drag').textContent = lang === 'es' ? 'Arrastrar' : 'Drag';
+  document.getElementById('instr-scroll').textContent = 'Scroll';
+  document.getElementById('instr-click').textContent = lang === 'es' ? 'Clic' : 'Click';
+  document.getElementById('instr-hover').textContent = 'Hover';
+
+  // Update HTML lang
+  document.documentElement.lang = lang;
+};
+
+// ── Resize ──
+window.addEventListener('resize', () => {
+  svg.attr('width', window.innerWidth).attr('height', window.innerHeight);
+  simulation.force('center', d3.forceCenter(window.innerWidth / 2, window.innerHeight / 2));
+  simulation.alpha(0.1).restart();
+});
+
+// ── Initial zoom to fit ──
+setTimeout(() => {
+  const padding = 60;
+  let minX = Infinity, maxX = -Infinity, minY = Infinity, maxY = -Infinity;
+  nodes.forEach(n => {
+    if (n.x < minX) minX = n.x;
+    if (n.x > maxX) maxX = n.x;
+    if (n.y < minY) minY = n.y;
+    if (n.y > maxY) maxY = n.y;
+  });
+  const dx = maxX - minX + padding * 2;
+  const dy = maxY - minY + padding * 2;
+  const scale = Math.min(width / dx, height / dy, 1.2);
+  const cx = (minX + maxX) / 2;
+  const cy = (minY + maxY) / 2;
+  const transform = d3.zoomIdentity
+    .translate(width / 2, height / 2)
+    .scale(scale)
+    .translate(-cx, -cy);
+  svg.transition().duration(1000).call(zoom.transform, transform);
+}, 2500);
+
+// Fade out instructions
+setTimeout(() => {
+  document.getElementById('instructions').style.opacity = '0';
+  setTimeout(() => document.getElementById('instructions').style.display = 'none', 600);
+}, 12000);
+</script>
+</body>
+</html>
