@@ -3,8 +3,13 @@
 
 Interactive bilingual knowledge graph and timeline tracing the history of artificial intelligence from Markov (1913) through ChatGPT (2022).
 
-### 🔗 Live Site
-**[https://aelius23.github.io/intro-ia-hispanohablantes/grafo-interactivo.html](https://aelius23.github.io/intro-ia-hispanohablantes/grafo-interactivo.html)**
+### 🔗 Live Sites
+
+**Genealogía de la IA / Genealogy of AI**  
+https://aelius23.github.io/intro-ia-hispanohablantes/grafo-interactivo.html
+
+**Uso de Modelos Locales · Grafo Curricular**  
+https://aelius23.github.io/intro-ia-hispanohablantes/mapa-curricular-modelos-locales.html
 
 ### ✍️ Author & Content
 **Sandra Acevedo** · [@SandraAcevedoA](https://github.com/SandraAcevedoA)
