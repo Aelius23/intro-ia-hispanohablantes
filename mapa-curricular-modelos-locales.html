@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Uso de Modelos Locales · Grafo Curricular</title>
+<meta name="description" content="Grafo curricular bilingüe del workshop Uso de Modelos Locales: checkpoints, artefactos, tareas, dinámicas y conceptos de decisión.">
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg: #0d1117;
+    --bg-panel: #161b22;
+    --bg-panel-glass: rgba(22, 27, 34, 0.92);
+    --border: #30363d;
+    --text: #e6edf3;
+    --text-dim: #8b949e;
+    --text-muted: #484f58;
+    --framework: #bc8cff;
+    --task: #f85149;
+    --prompting: #58a6ff;
+    --dynamic: #3fb950;
+    --concept: #d29922;
+    --user: #f778ba;
+    --checkpoint: #58a6ff;
+    --artifact: #f778ba;
+    --link-color: rgba(139, 148, 158, 0.18);
+    --accent: #7c3aed;
+  }
+
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    overflow: hidden;
+    height: 100vh;
+    width: 100vw;
+  }
+
+  #graph-container { width: 100%; height: 100%; position: absolute; top: 0; left: 0; }
+  svg { width: 100%; height: 100%; }
+
+  .top-bar {
+    position: fixed; top: 0; left: 0; right: 0; height: 48px;
+    background: var(--bg-panel-glass); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+    border-bottom: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: space-between; padding: 0 20px; z-index: 100;
+  }
+  .top-bar h1 { font-size: 14px; font-weight: 600; letter-spacing: -0.01em; }
+  .top-bar-controls { display: flex; align-items: center; gap: 8px; }
+  .lang-toggle { display: flex; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; overflow: hidden; }
+  .lang-btn { padding: 5px 14px; font-size: 12px; font-weight: 500; font-family: 'Inter', sans-serif; color: var(--text-dim); background: transparent; border: none; cursor: pointer; transition: all 0.2s; }
+  .lang-btn.active { background: var(--accent); color: #fff; }
+  .node-count { font-size: 11px; color: var(--text-muted); font-weight: 400; }
+
+  .legend {
+    position: fixed; bottom: 20px; left: 20px;
+    background: var(--bg-panel-glass); backdrop-filter: blur(16px); border: 1px solid var(--border); border-radius: 12px;
+    padding: 14px 18px; z-index: 100; display: flex; flex-direction: column; gap: 8px;
+    transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  .legend.collapsed { padding: 0; gap: 0; overflow: hidden; }
+  .legend.collapsed .legend-items { display: none; }
+  .legend-header { display: flex; align-items: center; justify-content: space-between; width: 100%; margin-bottom: 4px; }
+  .legend.collapsed .legend-header { margin-bottom: 0; }
+  .legend-toggle {
+    width: 26px; height: 26px; border-radius: 6px; border: 1px solid var(--border); background: var(--bg);
+    color: var(--text-dim); font-size: 13px; cursor: pointer; display: flex; align-items: center; justify-content: center;
+    transition: all 0.15s; flex-shrink: 0;
+  }
+  .legend-toggle:hover { background: var(--border); color: var(--text); }
+  .legend-label { font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); }
+  .legend.collapsed .legend-label { display: none; }
+  .legend-item { display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text-dim); cursor: pointer; transition: opacity 0.2s; }
+  .legend-item:hover { opacity: 0.8; }
+  .legend-dot { width: 10px; height: 10px; border-radius: 50%; flex-shrink: 0; }
+
+  /* Detail Panel */
+  .detail-panel {
+    position: fixed; top: 48px; right: 0; width: 420px; height: calc(100vh - 48px);
+    background: var(--bg-panel-glass); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+    border-left: 1px solid var(--border); z-index: 99;
+    transform: translateX(100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow-y: auto; padding: 24px;
+  }
+  .detail-panel.open { transform: translateX(0); }
+  .detail-panel .close-btn {
+    position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; border-radius: 6px;
+    border: 1px solid var(--border); background: var(--bg); color: var(--text-dim); font-size: 16px;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.15s;
+  }
+  .detail-panel .close-btn:hover { background: var(--border); color: var(--text); }
+
+  .detail-category { display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 10px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 12px; }
+  .detail-category.framework { background: var(--framework); color: #0d1117; }
+  .detail-category.task { background: var(--task); color: #fff; }
+  .detail-category.prompting { background: var(--prompting); color: #0d1117; }
+  .detail-category.dynamic { background: var(--dynamic); color: #0d1117; }
+  .detail-category.concept { background: var(--concept); color: #0d1117; }
+  .detail-category.user { background: var(--user); color: #0d1117; }
+  .detail-category.checkpoint { background: var(--checkpoint); color: #0d1117; }
+  .detail-category.artifact { background: var(--artifact); color: #0d1117; }
+
+  .detail-title { font-size: 18px; font-weight: 700; line-height: 1.3; margin-bottom: 16px; }
+  .detail-description { font-size: 13px; line-height: 1.65; color: var(--text-dim); margin-bottom: 20px; }
+  .detail-section-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--text-muted); margin-bottom: 8px; margin-top: 16px; }
+  .detail-connections { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 16px; }
+  .detail-conn-chip { padding: 4px 10px; border-radius: 6px; font-size: 11px; font-weight: 500; background: var(--bg); border: 1px solid var(--border); color: var(--text-dim); cursor: pointer; transition: all 0.15s; }
+  .detail-conn-chip:hover { border-color: var(--accent); color: var(--text); }
+
+  /* Tables in panel */
+  .detail-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; font-size: 11px; }
+  .detail-table th { text-align: left; padding: 6px 8px; background: rgba(99,110,123,0.12); border: 1px solid var(--border); color: var(--text-dim); font-weight: 600; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; }
+  .detail-table td { padding: 6px 8px; border: 1px solid var(--border); color: var(--text-dim); line-height: 1.5; vertical-align: top; }
+  .detail-table tr:hover td { background: rgba(99,110,123,0.06); }
+
+  /* Collapsible sections */
+  .detail-collapsible { margin-bottom: 12px; }
+  .detail-collapsible summary {
+    font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em;
+    color: var(--text-muted); cursor: pointer; padding: 6px 0; transition: color 0.15s; list-style: none;
+  }
+  .detail-collapsible summary::before { content: '▸ '; font-size: 10px; }
+  .detail-collapsible[open] summary::before { content: '▾ '; }
+  .detail-collapsible summary:hover { color: var(--text-dim); }
+  .detail-collapsible .inner { padding-top: 8px; }
+
+  /* References */
+  .ref-item { font-size: 11px; line-height: 1.55; color: var(--text-dim); margin-bottom: 10px; }
+  .ref-item a { color: var(--prompting); text-decoration: none; word-break: break-all; }
+  .ref-item a:hover { text-decoration: underline; }
+  .ref-group-label { font-size: 10px; font-weight: 600; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.04em; margin-bottom: 6px; margin-top: 12px; }
+
+  .search-container { position: relative; }
+  .search-input { width: 200px; padding: 5px 12px 5px 28px; font-size: 12px; font-family: 'Inter', sans-serif; color: var(--text); background: var(--bg); border: 1px solid var(--border); border-radius: 8px; outline: none; transition: border-color 0.2s; }
+  .search-input::placeholder { color: var(--text-muted); }
+  .search-input:focus { border-color: var(--accent); }
+  .search-icon { position: absolute; left: 9px; top: 50%; transform: translateY(-50%); color: var(--text-muted); font-size: 12px; pointer-events: none; }
+
+  .tooltip { position: fixed; padding: 6px 12px; background: var(--bg-panel); border: 1px solid var(--border); border-radius: 8px; font-size: 12px; font-weight: 500; color: var(--text); pointer-events: none; opacity: 0; transition: opacity 0.15s; z-index: 200; max-width: 260px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tooltip.visible { opacity: 1; }
+
+  .instructions { position: fixed; bottom: 20px; right: 20px; background: var(--bg-panel-glass); backdrop-filter: blur(16px); border: 1px solid var(--border); border-radius: 12px; padding: 12px 16px; z-index: 100; font-size: 11px; color: var(--text-muted); line-height: 1.6; max-width: 220px; transition: opacity 0.5s; }
+
+  @media (max-width: 768px) {
+    .detail-panel { width: 100%; }
+    .search-input { width: 120px; }
+    .instructions { display: none; }
+  }
+</style>
+</head>
+<body>
+
+<div class="top-bar">
+  <div style="display:flex;align-items:center;gap:16px;">
+    <h1 id="main-title">Uso de Modelos Locales · Grafo Curricular</h1>
+    <span class="node-count" id="node-count"></span>
+  </div>
+  <div class="top-bar-controls">
+    <div class="search-container">
+      <span class="search-icon">⌕</span>
+      <input type="text" class="search-input" id="search" placeholder="Buscar nodo...">
+    </div>
+    <div class="lang-toggle">
+      <button class="lang-btn active" id="btn-es" onclick="setLang('es')">ES</button>
+      <button class="lang-btn" id="btn-en" onclick="setLang('en')">EN</button>
+    </div>
+  </div>
+</div>
+
+<div class="legend" id="legend">
+  <div class="legend-header">
+    <span class="legend-label" id="legend-label">Leyenda</span>
+    <button class="legend-toggle" id="legend-toggle" onclick="toggleLegend()" title="Minimizar">−</button>
+  </div>
+  <div class="legend-items" id="legend-items"></div>
+</div>
+<div class="instructions" id="instructions">
+  <strong id="instr-title">Navegación</strong><br>
+  <span id="instr-drag">Arrastrar</span>: mover nodos<br>
+  <span id="instr-scroll">Scroll</span>: zoom<br>
+  <span id="instr-click">Clic</span>: ver ficha<br>
+  <span id="instr-hover">Hover</span>: resaltar conexiones
+</div>
+
+<div id="graph-container"></div>
+
+<div class="detail-panel" id="detail-panel">
+  <button class="close-btn" onclick="closePanel()">×</button>
+  <div id="detail-content"></div>
+</div>
+
+<div class="tooltip" id="tooltip"></div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// ═══════════════════════════════════════════
+// CURRICULUM DATA — observable checkpoints and supporting concepts
+// ═══════════════════════════════════════════
+
+const NODES = [
+  {
+    "id": "uso-modelos-locales",
+    "category": "framework",
+    "label": {
+      "es": "Uso de Modelos Locales",
+      "en": "Using Local Models"
+    },
+    "desc": {
+      "es": "Grafo curricular de la Clase 245. Organiza una sola cadena de decisión: perfilar el hardware, elegir un modelo, intentar inferencia local, evaluar capacidad, decidir el enrutamiento y consolidar un plan reutilizable.",
+      "en": "Curriculum graph for Class 245. It organizes one decision chain: profile the hardware, choose a model, attempt local inference, evaluate capability, make a routing decision, and consolidate a reusable plan."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Tipo de ficha",
+          "Índice curricular"
+        ],
+        [
+          "Función",
+          "Hacer visible la secuencia completa y sus evidencias"
+        ],
+        [
+          "Punto de entrada",
+          "Una tarea real que la persona quiere resolver"
+        ],
+        [
+          "Piso de aprobación",
+          "Cinco checkpoints observables más el artefacto final"
+        ]
+      ],
+      "en": [
+        [
+          "File type",
+          "Curriculum index"
+        ],
+        [
+          "Function",
+          "Make the complete sequence and its evidence visible"
+        ],
+        [
+          "Entry point",
+          "A real task the participant wants to solve"
+        ],
+        [
+          "Completion floor",
+          "Five observable checkpoints plus the final artifact"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {
+        "Cadena canónica": [
+          [
+            "Paso",
+            "Salida observable"
+          ],
+          [
+            "1",
+            "Hardware Profile"
+          ],
+          [
+            "2",
+            "Model Choice"
+          ],
+          [
+            "3",
+            "Local Inference"
+          ],
+          [
+            "4",
+            "Capability Evaluation"
+          ],
+          [
+            "5",
+            "Routing Decision"
+          ],
+          [
+            "Cierre",
+            "My Local Model Plan"
+          ]
+        ]
+      },
+      "en": {
+        "Canonical chain": [
+          [
+            "Step",
+            "Observable output"
+          ],
+          [
+            "1",
+            "Hardware Profile"
+          ],
+          [
+            "2",
+            "Model Choice"
+          ],
+          [
+            "3",
+            "Local Inference"
+          ],
+          [
+            "4",
+            "Capability Evaluation"
+          ],
+          [
+            "5",
+            "Routing Decision"
+          ],
+          [
+            "Close",
+            "My Local Model Plan"
+          ]
+        ]
+      }
+    },
+    "refs": {
+      "shared": [],
+      "specific": [
+        {
+          "text": "The Multiverse School — Clase 245",
+          "url": "https://themultiverse.school/classes/245"
+        },
+        {
+          "text": "Mapa de Compatibilidad LLM — fuente pedagógica",
+          "url": "https://aelius23.github.io/intro-ia-hispanohablantes/mapa-compatibilidad-llm.html"
+        }
+      ]
+    }
+  },
+  {
+    "id": "inferencia-local",
+    "category": "concept",
+    "label": {
+      "es": "Inferencia local",
+      "en": "Local inference"
+    },
+    "desc": {
+      "es": "La inferencia ocurre en el dispositivo de la persona, no en un servidor remoto. Una aplicación de escritorio no es necesariamente local: el criterio es dónde se ejecuta el modelo y dónde viajan los datos.",
+      "en": "Inference happens on the participant's device, not on a remote server. A desktop app is not necessarily local: the criterion is where the model runs and where the data travels."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Pregunta guía",
+          "¿Dónde se ejecuta el modelo?"
+        ],
+        [
+          "Qué observar",
+          "Si el flujo requiere una llamada a un servicio remoto"
+        ],
+        [
+          "Consecuencia",
+          "Privacidad, conectividad, costo y control cambian según la arquitectura"
+        ]
+      ],
+      "en": [
+        [
+          "Guiding question",
+          "Where does the model run?"
+        ],
+        [
+          "What to observe",
+          "Whether the workflow requires a remote-service call"
+        ],
+        [
+          "Consequence",
+          "Privacy, connectivity, cost, and control change with the architecture"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "hardware-envelope",
+    "category": "concept",
+    "label": {
+      "es": "Hardware Envelope",
+      "en": "Hardware Envelope"
+    },
+    "desc": {
+      "es": "Perfil práctico de los recursos disponibles para inferencia: sistema operativo, RAM, GPU y VRAM o memoria unificada cuando aplique, almacenamiento libre y presión del contexto. El archivo puede caber en disco y aun así no haber memoria suficiente para ejecutarlo.",
+      "en": "A practical profile of the resources available for inference: operating system, RAM, GPU and VRAM or unified memory when applicable, free storage, and context pressure. A file may fit on disk while there is still not enough memory to run it."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Variables mínimas",
+          "SO · RAM · GPU/memoria gráfica · almacenamiento libre"
+        ],
+        [
+          "Interpretación",
+          "Qué rango de modelos vale la pena investigar"
+        ],
+        [
+          "Límite",
+          "Es un envelope conservador, no una garantía de rendimiento"
+        ]
+      ],
+      "en": [
+        [
+          "Minimum variables",
+          "OS · RAM · GPU/graphics memory · free storage"
+        ],
+        [
+          "Interpretation",
+          "Which model range is worth investigating"
+        ],
+        [
+          "Limit",
+          "It is a conservative envelope, not a performance guarantee"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "model-card-lens",
+    "category": "concept",
+    "label": {
+      "es": "Model Card Lens",
+      "en": "Model Card Lens"
+    },
+    "desc": {
+      "es": "Lectura mínima de un repositorio o ficha de modelo para tomar una decisión: quién publica, qué modelo es, parámetros, formato GGUF, cuantización, tamaño real del archivo, contexto, usos previstos y límites documentados.",
+      "en": "Minimum reading of a model repository or card for decision-making: publisher, model identity, parameters, GGUF format, quantization, actual file size, context, intended uses, and documented limits."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Quién",
+          "Publicador y procedencia"
+        ],
+        [
+          "Qué",
+          "Familia, parámetros y propósito"
+        ],
+        [
+          "Formato",
+          "GGUF y compatibilidad con el runner"
+        ],
+        [
+          "Tamaño",
+          "Cuantización y tamaño real del archivo"
+        ],
+        [
+          "Fit",
+          "Lenguaje, tarea, contexto y límites"
+        ]
+      ],
+      "en": [
+        [
+          "Who",
+          "Publisher and provenance"
+        ],
+        [
+          "What",
+          "Family, parameters, and purpose"
+        ],
+        [
+          "Format",
+          "GGUF and runner compatibility"
+        ],
+        [
+          "Size",
+          "Quantization and actual file size"
+        ],
+        [
+          "Fit",
+          "Language, task, context, and limits"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": [
+        {
+          "text": "Hugging Face — Model Cards",
+          "url": "https://huggingface.co/docs/hub/en/model-cards"
+        },
+        {
+          "text": "Hugging Face — GGUF",
+          "url": "https://huggingface.co/docs/hub/gguf"
+        }
+      ]
+    }
+  },
+  {
+    "id": "seleccion-capacidad-vs-compatibilidad",
+    "category": "concept",
+    "label": {
+      "es": "Capacidad vs. compatibilidad",
+      "en": "Capability vs. compatibility"
+    },
+    "desc": {
+      "es": "Que un modelo pueda ejecutar una operación o que físicamente quepa en el equipo no demuestra que sea adecuado para la tarea, la dinámica de trabajo, el idioma o el costo de error de esta persona.",
+      "en": "A model being able to perform an operation, or physically fitting on the device, does not prove that it is suitable for this participant's task, interaction dynamic, language, or error cost."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Capacidad",
+          "Qué puede hacer o qué puede correr"
+        ],
+        [
+          "Compatibilidad",
+          "Si esa capacidad encaja en este uso concreto"
+        ],
+        [
+          "Error a evitar",
+          "Dejar que tamaño, hype o benchmark decidan solos"
+        ],
+        [
+          "Regla",
+          "Hardware Fit no implica Task Fit ni Operational Fit"
+        ]
+      ],
+      "en": [
+        [
+          "Capability",
+          "What it can do or what can run"
+        ],
+        [
+          "Compatibility",
+          "Whether that capability fits this concrete use"
+        ],
+        [
+          "Error to avoid",
+          "Letting size, hype, or benchmarks decide alone"
+        ],
+        [
+          "Rule",
+          "Hardware Fit does not imply Task Fit or Operational Fit"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "evaluacion-situada",
+    "category": "concept",
+    "label": {
+      "es": "Evaluación situada",
+      "en": "Situated evaluation"
+    },
+    "desc": {
+      "es": "Un modelo se evalúa con una tarea concreta y criterios vinculados a ese uso. Una respuesta vistosa o un benchmark general no reemplazan observar velocidad, calidad y límites en condiciones relevantes.",
+      "en": "A model is evaluated with a concrete task and criteria tied to that use. An impressive answer or general benchmark does not replace observing speed, quality, and limits under relevant conditions."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Unidad de prueba",
+          "Una tarea concreta"
+        ],
+        [
+          "Dimensiones comunes",
+          "Velocidad · calidad · límites"
+        ],
+        [
+          "Criterios específicos",
+          "Dependen de la tarea y la dinámica"
+        ],
+        [
+          "Conclusión válida",
+          "Suficiente o insuficiente para este uso, bajo estas condiciones"
+        ]
+      ],
+      "en": [
+        [
+          "Test unit",
+          "One concrete task"
+        ],
+        [
+          "Common dimensions",
+          "Speed · quality · limitations"
+        ],
+        [
+          "Specific criteria",
+          "Depend on the task and interaction dynamic"
+        ],
+        [
+          "Valid conclusion",
+          "Sufficient or insufficient for this use, under these conditions"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "routing-architecture",
+    "category": "concept",
+    "label": {
+      "es": "Local · nube · híbrido",
+      "en": "Local · cloud · hybrid"
+    },
+    "desc": {
+      "es": "La decisión final no busca un ganador ideológico. Distribuye la tarea según privacidad, hardware, calidad, velocidad, conectividad, costo, repetibilidad y necesidad de información actual o externa.",
+      "en": "The final decision does not seek an ideological winner. It routes the task according to privacy, hardware, quality, speed, connectivity, cost, repeatability, and the need for current or external information."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Local",
+          "Los datos y la inferencia permanecen en el dispositivo"
+        ],
+        [
+          "Nube",
+          "La tarea necesita capacidad o información externa que el flujo local no entrega"
+        ],
+        [
+          "Híbrido",
+          "Distintas partes de la tarea se asignan a arquitecturas distintas"
+        ],
+        [
+          "Regla",
+          "La decisión se ancla a evidencia del checkpoint 4"
+        ]
+      ],
+      "en": [
+        [
+          "Local",
+          "Data and inference stay on the device"
+        ],
+        [
+          "Cloud",
+          "The task needs capability or external information the local flow does not provide"
+        ],
+        [
+          "Hybrid",
+          "Different parts of the task are assigned to different architectures"
+        ],
+        [
+          "Rule",
+          "The decision is anchored to evidence from checkpoint 4"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "fallback-supported",
+    "category": "concept",
+    "label": {
+      "es": "Ruta de respaldo válida",
+      "en": "Valid fallback path"
+    },
+    "desc": {
+      "es": "No lograr inferencia local durante la sesión no invalida el aprendizaje. Diagnosticar la restricción, documentar hasta dónde llegó el flujo y evaluar una salida compartida son evidencias completas cuando el hardware o la videollamada impiden ejecutar.",
+      "en": "Failing to achieve local inference during the session does not invalidate the learning. Diagnosing the constraint, documenting how far the flow reached, and evaluating a shared output are complete forms of evidence when hardware or the video call prevents execution."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "No cuenta como fracaso",
+          "Detenerse por una restricción correctamente diagnosticada"
+        ],
+        [
+          "Evidencia",
+          "Paso alcanzado · señal observada · restricción · ruta tomada"
+        ],
+        [
+          "Evaluación",
+          "Puede realizarse sobre una salida compartida"
+        ],
+        [
+          "Principio",
+          "Se evalúa la decisión y el diagnóstico, no la riqueza del hardware"
+        ]
+      ],
+      "en": [
+        [
+          "Not a failure",
+          "Stopping because of a correctly diagnosed constraint"
+        ],
+        [
+          "Evidence",
+          "Step reached · signal observed · constraint · route taken"
+        ],
+        [
+          "Evaluation",
+          "May be completed using a shared output"
+        ],
+        [
+          "Principle",
+          "The decision and diagnosis are assessed, not hardware wealth"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "cp1-hardware-profile",
+    "category": "checkpoint",
+    "label": {
+      "es": "Checkpoint 1 — Hardware Profile",
+      "en": "Checkpoint 1 — Hardware Profile"
+    },
+    "desc": {
+      "es": "La persona inspecciona su equipo antes de mirar modelos y produce un perfil escrito que conecta recursos disponibles con implicaciones prácticas para inferencia local.",
+      "en": "The participant inspects their device before looking at models and produces a written profile that connects available resources to practical implications for local inference."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Tarea observable",
+          "Registrar SO, RAM, GPU y VRAM/memoria unificada si aplica, y espacio libre"
+        ],
+        [
+          "Artefacto",
+          "Hardware Profile escrito"
+        ],
+        [
+          "Evidencia mínima",
+          "Los datos del equipo más una frase propia sobre qué implican"
+        ],
+        [
+          "Criterio de aprobación",
+          "El perfil distingue almacenamiento de memoria de ejecución y no promete compatibilidad absoluta"
+        ]
+      ],
+      "en": [
+        [
+          "Observable task",
+          "Record OS, RAM, GPU and VRAM/unified memory when applicable, and free storage"
+        ],
+        [
+          "Artifact",
+          "Written Hardware Profile"
+        ],
+        [
+          "Minimum evidence",
+          "Device data plus one original sentence about what it implies"
+        ],
+        [
+          "Passing criterion",
+          "The profile distinguishes storage from runtime memory and makes no absolute compatibility promise"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "cp2-model-choice",
+    "category": "checkpoint",
+    "label": {
+      "es": "Checkpoint 2 — Model Choice",
+      "en": "Checkpoint 2 — Model Choice"
+    },
+    "desc": {
+      "es": "La persona compara candidatos contra su Hardware Profile y su tarea, elige una variante concreta y deja visible la información que sostuvo la elección.",
+      "en": "The participant compares candidates against their Hardware Profile and task, chooses a concrete variant, and makes the evidence behind the choice visible."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Tarea observable",
+          "Leer fichas/repositorios y comparar al menos los datos que afectan hardware y tarea"
+        ],
+        [
+          "Artefacto",
+          "Model Choice escrito"
+        ],
+        [
+          "Evidencia mínima",
+          "Modelo · formato · cuantización · tamaño/memoria estimada · contexto · razón de ajuste"
+        ],
+        [
+          "Criterio de aprobación",
+          "La elección se justifica por hardware + tarea + trade-offs; elegir el más grande no basta"
+        ]
+      ],
+      "en": [
+        [
+          "Observable task",
+          "Read cards/repositories and compare at least the data that affects hardware and task"
+        ],
+        [
+          "Artifact",
+          "Written Model Choice"
+        ],
+        [
+          "Minimum evidence",
+          "Model · format · quantization · size/memory estimate · context · fit rationale"
+        ],
+        [
+          "Passing criterion",
+          "The choice is justified by hardware + task + trade-offs; choosing the largest is not enough"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "cp3-local-inference",
+    "category": "checkpoint",
+    "label": {
+      "es": "Checkpoint 3 — Local Inference",
+      "en": "Checkpoint 3 — Local Inference"
+    },
+    "desc": {
+      "es": "La persona recorre el flujo local hasta donde su equipo permita y produce una bitácora verificable. Ejecutar un prompt o diagnosticar correctamente el punto de detención son rutas aprobatorias.",
+      "en": "The participant follows the local flow as far as the device allows and produces a verifiable run log. Running a prompt or correctly diagnosing the stopping point are both passing routes."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Tarea observable",
+          "Abrir el runner, seleccionar/cargar el modelo e intentar un prompt"
+        ],
+        [
+          "Artefacto",
+          "Bitácora de ejecución"
+        ],
+        [
+          "Evidencia mínima",
+          "Hasta qué paso llegó · qué vio · si se detuvo, restricción concreta y fallback"
+        ],
+        [
+          "Criterio de aprobación",
+          "La bitácora demuestra inferencia local o un diagnóstico correcto; no exige generar tokens en la máquina propia"
+        ]
+      ],
+      "en": [
+        [
+          "Observable task",
+          "Open the runner, select/load the model, and attempt a prompt"
+        ],
+        [
+          "Artifact",
+          "Run log"
+        ],
+        [
+          "Minimum evidence",
+          "Step reached · what was observed · if stopped, concrete constraint and fallback"
+        ],
+        [
+          "Passing criterion",
+          "The log demonstrates local inference or a correct diagnosis; generating tokens on one's own device is not required"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "cp4-capability-evaluation",
+    "category": "checkpoint",
+    "label": {
+      "es": "Checkpoint 4 — Capability Evaluation",
+      "en": "Checkpoint 4 — Capability Evaluation"
+    },
+    "desc": {
+      "es": "La persona prueba o examina una salida para su tarea concreta y registra por separado velocidad, calidad y límites. La salida puede ser propia o provenir de la demostración compartida.",
+      "en": "The participant tests or examines an output for the concrete task and records speed, quality, and limitations separately. The output may be their own or come from the shared demonstration."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Tarea observable",
+          "Aplicar la tarea candidata y juzgar la salida con criterios explícitos"
+        ],
+        [
+          "Artefacto",
+          "Capability Evaluation completada"
+        ],
+        [
+          "Evidencia mínima",
+          "Observaciones de velocidad · calidad · límites"
+        ],
+        [
+          "Criterio de aprobación",
+          "Las observaciones describen evidencia; no se reducen a «funciona/no funciona»"
+        ]
+      ],
+      "en": [
+        [
+          "Observable task",
+          "Apply the candidate task and judge the output with explicit criteria"
+        ],
+        [
+          "Artifact",
+          "Completed Capability Evaluation"
+        ],
+        [
+          "Minimum evidence",
+          "Observations of speed · quality · limitations"
+        ],
+        [
+          "Passing criterion",
+          "The observations describe evidence; they do not collapse into “works/doesn't work”"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "cp5-routing-decision",
+    "category": "checkpoint",
+    "label": {
+      "es": "Checkpoint 5 — Routing Decision",
+      "en": "Checkpoint 5 — Routing Decision"
+    },
+    "desc": {
+      "es": "La persona decide si la tarea evaluada debe vivir en local, en la nube o en un flujo híbrido y conecta la decisión con una observación concreta del checkpoint anterior.",
+      "en": "The participant decides whether the evaluated task belongs locally, in the cloud, or in a hybrid workflow and connects the decision to a concrete observation from the previous checkpoint."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Tarea observable",
+          "Clasificar la tarea y justificar el enrutamiento"
+        ],
+        [
+          "Artefacto",
+          "Routing Decision escrita"
+        ],
+        [
+          "Evidencia mínima",
+          "Local / nube / híbrido + una razón anclada al checkpoint 4"
+        ],
+        [
+          "Criterio de aprobación",
+          "La razón usa trade-offs observados, no preferencia o hype"
+        ]
+      ],
+      "en": [
+        [
+          "Observable task",
+          "Classify the task and justify the routing"
+        ],
+        [
+          "Artifact",
+          "Written Routing Decision"
+        ],
+        [
+          "Minimum evidence",
+          "Local / cloud / hybrid + one reason anchored to checkpoint 4"
+        ],
+        [
+          "Passing criterion",
+          "The reason uses observed trade-offs, not preference or hype"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "my-local-model-plan",
+    "category": "artifact",
+    "label": {
+      "es": "My Local Model Plan",
+      "en": "My Local Model Plan"
+    },
+    "desc": {
+      "es": "Artefacto acumulativo del workshop. Reúne la tarea, el Hardware Profile, el Model Choice, la bitácora de inferencia, la evaluación y la decisión de enrutamiento para que el proceso pueda repetirse con otro modelo o dispositivo.",
+      "en": "The workshop's cumulative artifact. It brings together the task, Hardware Profile, Model Choice, inference log, evaluation, and routing decision so the process can be repeated with another model or device."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Tipo de ficha",
+          "Artefacto final acumulativo"
+        ],
+        [
+          "Tarea observable",
+          "Consolidar los cinco checkpoints sin borrar incertidumbres ni fallbacks"
+        ],
+        [
+          "Contenido mínimo",
+          "Tarea · hardware · candidato · ejecución · evaluación · routing"
+        ],
+        [
+          "Criterio de aprobación",
+          "Cada decisión es trazable a una observación o dato y el plan puede repetirse"
+        ]
+      ],
+      "en": [
+        [
+          "File type",
+          "Cumulative final artifact"
+        ],
+        [
+          "Observable task",
+          "Consolidate all five checkpoints without erasing uncertainty or fallbacks"
+        ],
+        [
+          "Minimum content",
+          "Task · hardware · candidate · execution · evaluation · routing"
+        ],
+        [
+          "Passing criterion",
+          "Every decision traces to an observation or datum and the plan can be repeated"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {
+        "Secciones del plan": [
+          [
+            "Sección",
+            "Proviene de"
+          ],
+          [
+            "1. Tarea candidata",
+            "Apertura"
+          ],
+          [
+            "2. Hardware",
+            "Checkpoint 1"
+          ],
+          [
+            "3. Modelo y variante",
+            "Checkpoint 2"
+          ],
+          [
+            "4. Condición y bitácora de ejecución",
+            "Checkpoint 3"
+          ],
+          [
+            "5. Evaluación",
+            "Checkpoint 4"
+          ],
+          [
+            "6. Decisión final",
+            "Checkpoint 5"
+          ]
+        ]
+      },
+      "en": {
+        "Plan sections": [
+          [
+            "Section",
+            "Comes from"
+          ],
+          [
+            "1. Candidate task",
+            "Opening"
+          ],
+          [
+            "2. Hardware",
+            "Checkpoint 1"
+          ],
+          [
+            "3. Model and variant",
+            "Checkpoint 2"
+          ],
+          [
+            "4. Run condition and log",
+            "Checkpoint 3"
+          ],
+          [
+            "5. Evaluation",
+            "Checkpoint 4"
+          ],
+          [
+            "6. Final decision",
+            "Checkpoint 5"
+          ]
+        ]
+      }
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "task-write-transform",
+    "category": "task",
+    "label": {
+      "es": "Write / Transform text",
+      "en": "Write / Transform text"
+    },
+    "desc": {
+      "es": "Redactar, reescribir, resumir, traducir, adaptar o reformatear texto. La evaluación observa seguimiento de instrucciones, registro, adiciones no sustentadas y control de cambios.",
+      "en": "Draft, rewrite, summarize, translate, adapt, or reformat text. Evaluation observes instruction following, register, unsupported additions, and change control."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Pregunta",
+          "¿Qué transformación exacta debe producir?"
+        ],
+        [
+          "Riesgos",
+          "Pérdida de voz · adiciones · formato incorrecto"
+        ],
+        [
+          "Criterios",
+          "Precisión · registro · completitud · control de cambios"
+        ]
+      ],
+      "en": [
+        [
+          "Question",
+          "What exact transformation must be produced?"
+        ],
+        [
+          "Risks",
+          "Voice loss · additions · wrong format"
+        ],
+        [
+          "Criteria",
+          "Precision · register · completeness · change control"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "task-analyze-documents",
+    "category": "task",
+    "label": {
+      "es": "Analyze documents",
+      "en": "Analyze documents"
+    },
+    "desc": {
+      "es": "Extraer, clasificar, comparar o sintetizar información contenida en documentos. La evaluación observa cobertura, fidelidad al material y separación entre evidencia e inferencia.",
+      "en": "Extract, classify, compare, or synthesize information contained in documents. Evaluation observes coverage, fidelity to the material, and separation between evidence and inference."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Pregunta",
+          "¿Qué debe encontrarse o compararse?"
+        ],
+        [
+          "Riesgos",
+          "Omisiones · afirmaciones no sustentadas · pérdida de matiz"
+        ],
+        [
+          "Criterios",
+          "Cobertura · fidelidad · trazabilidad"
+        ]
+      ],
+      "en": [
+        [
+          "Question",
+          "What must be found or compared?"
+        ],
+        [
+          "Risks",
+          "Omissions · unsupported claims · loss of nuance"
+        ],
+        [
+          "Criteria",
+          "Coverage · fidelity · traceability"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "task-code-debug",
+    "category": "task",
+    "label": {
+      "es": "Code / Debug",
+      "en": "Code / Debug"
+    },
+    "desc": {
+      "es": "Escribir, explicar, revisar o depurar código dentro de un entorno real. La evaluación observa ejecución, cumplimiento de requisitos, APIs inventadas, compatibilidad y carga de revisión humana.",
+      "en": "Write, explain, review, or debug code inside a real environment. Evaluation observes execution, requirements compliance, invented APIs, compatibility, and human review load."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Pregunta",
+          "¿Qué debe ejecutar o corregirse?"
+        ],
+        [
+          "Riesgos",
+          "Código plausible pero incorrecto · comandos peligrosos · incompatibilidad"
+        ],
+        [
+          "Criterios",
+          "Ejecución · requisitos · verificabilidad"
+        ]
+      ],
+      "en": [
+        [
+          "Question",
+          "What must run or be fixed?"
+        ],
+        [
+          "Risks",
+          "Plausible but incorrect code · dangerous commands · incompatibility"
+        ],
+        [
+          "Criteria",
+          "Execution · requirements · verifiability"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "task-reason-review",
+    "category": "task",
+    "label": {
+      "es": "Reason / Review",
+      "en": "Reason / Review"
+    },
+    "desc": {
+      "es": "Analizar, criticar, comparar criterios o revisar una decisión. La evaluación observa precisión conceptual, separación de capas, razonamiento verificable y respeto al alcance.",
+      "en": "Analyze, critique, compare criteria, or review a decision. Evaluation observes conceptual precision, layer separation, verifiable reasoning, and respect for scope."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Pregunta",
+          "¿Qué afirmación o decisión debe tensionarse?"
+        ],
+        [
+          "Riesgos",
+          "Certeza excesiva · falsa equivalencia · desvío"
+        ],
+        [
+          "Criterios",
+          "Precisión · juicio · trazabilidad · alcance"
+        ]
+      ],
+      "en": [
+        [
+          "Question",
+          "What claim or decision must be tested?"
+        ],
+        [
+          "Risks",
+          "Excessive certainty · false equivalence · drift"
+        ],
+        [
+          "Criteria",
+          "Precision · judgment · traceability · scope"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "task-create-ideate",
+    "category": "task",
+    "label": {
+      "es": "Create / Ideate",
+      "en": "Create / Ideate"
+    },
+    "desc": {
+      "es": "Producir alternativas, conceptos, borradores o estructuras cuando el resultado aún no está cerrado. La evaluación observa variedad útil, continuidad de intención y capacidad de convertir exploración en un artefacto.",
+      "en": "Produce alternatives, concepts, drafts, or structures when the result is not yet closed. Evaluation observes useful variety, continuity of intent, and the ability to turn exploration into an artifact."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Pregunta",
+          "¿Qué espacio de posibilidades se quiere explorar?"
+        ],
+        [
+          "Riesgos",
+          "Cierre prematuro · opciones genéricas · pérdida de intención"
+        ],
+        [
+          "Criterios",
+          "Variedad útil · coherencia · capacidad de síntesis"
+        ]
+      ],
+      "en": [
+        [
+          "Question",
+          "What possibility space should be explored?"
+        ],
+        [
+          "Risks",
+          "Premature closure · generic options · loss of intent"
+        ],
+        [
+          "Criteria",
+          "Useful variety · coherence · synthesis"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "dynamic-direct",
+    "category": "dynamic",
+    "label": {
+      "es": "Direct / One-shot",
+      "en": "Direct / One-shot"
+    },
+    "desc": {
+      "es": "Una instrucción clara y una salida directa. Importan obediencia de formato, brevedad, precisión y velocidad.",
+      "en": "One clear instruction and one direct output. Format compliance, brevity, precision, and speed matter."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Patrón",
+          "Una solicitud → una respuesta"
+        ],
+        [
+          "Observar",
+          "Formato · precisión · sobrerrespuesta"
+        ],
+        [
+          "Riesgo",
+          "Evaluar por apariencia sin verificar cumplimiento"
+        ]
+      ],
+      "en": [
+        [
+          "Pattern",
+          "One request → one response"
+        ],
+        [
+          "Observe",
+          "Format · precision · over-response"
+        ],
+        [
+          "Risk",
+          "Judging by appearance without verifying compliance"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "dynamic-iterative",
+    "category": "dynamic",
+    "label": {
+      "es": "Iterative",
+      "en": "Iterative"
+    },
+    "desc": {
+      "es": "Versiones sucesivas con retroalimentación y ajustes específicos. Importan memoria intra-chat, precisión de cambios, consistencia y drift.",
+      "en": "Successive versions with feedback and specific adjustments. Intra-chat memory, change precision, consistency, and drift matter."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Patrón",
+          "Respuesta → feedback → revisión"
+        ],
+        [
+          "Observar",
+          "Retención de instrucciones · control de cambios"
+        ],
+        [
+          "Riesgo",
+          "Drift y ruido acumulado"
+        ]
+      ],
+      "en": [
+        [
+          "Pattern",
+          "Response → feedback → revision"
+        ],
+        [
+          "Observe",
+          "Instruction retention · change control"
+        ],
+        [
+          "Risk",
+          "Drift and accumulated noise"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "dynamic-critical",
+    "category": "dynamic",
+    "label": {
+      "es": "Critical / Review",
+      "en": "Critical / Review"
+    },
+    "desc": {
+      "es": "El modelo revisa, detecta errores, compara versiones o audita calidad. Importan precisión, trazabilidad, separación de capas y capacidad de decir que no sabe.",
+      "en": "The model reviews, detects errors, compares versions, or audits quality. Precision, traceability, layer separation, and the ability to say it does not know matter."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Patrón",
+          "Material → criterios → revisión"
+        ],
+        [
+          "Observar",
+          "Errores detectados · falsos positivos · evidencia"
+        ],
+        [
+          "Riesgo",
+          "Crítica convincente pero no sustentada"
+        ]
+      ],
+      "en": [
+        [
+          "Pattern",
+          "Material → criteria → review"
+        ],
+        [
+          "Observe",
+          "Detected errors · false positives · evidence"
+        ],
+        [
+          "Risk",
+          "Convincing but unsupported critique"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  },
+  {
+    "id": "dynamic-sustained",
+    "category": "dynamic",
+    "label": {
+      "es": "Sustained / Long-context",
+      "en": "Sustained / Long-context"
+    },
+    "desc": {
+      "es": "Trabajo que exige mantener instrucciones, material o decisiones a través de un contexto extenso. Importan retención, prioridad, consistencia y presión de memoria.",
+      "en": "Work that requires maintaining instructions, material, or decisions across an extended context. Retention, priority, consistency, and memory pressure matter."
+    },
+    "quickTable": {
+      "es": [
+        [
+          "Patrón",
+          "Material o conversación extensa"
+        ],
+        [
+          "Observar",
+          "Pérdida de prioridad · omisiones · consistencia"
+        ],
+        [
+          "Riesgo",
+          "Contexto anunciado no equivale a contexto útil ni gratuito"
+        ]
+      ],
+      "en": [
+        [
+          "Pattern",
+          "Extended material or conversation"
+        ],
+        [
+          "Observe",
+          "Priority loss · omissions · consistency"
+        ],
+        [
+          "Risk",
+          "Advertised context does not equal useful or free context"
+        ]
+      ]
+    },
+    "extraTables": {
+      "es": {},
+      "en": {}
+    },
+    "refs": {
+      "shared": [],
+      "specific": []
+    }
+  }
+];
+
+// CURRICULUM LINKS
+const LINK_DATA = [
+  [
+    "uso-modelos-locales",
+    "inferencia-local"
+  ],
+  [
+    "uso-modelos-locales",
+    "cp1-hardware-profile"
+  ],
+  [
+    "inferencia-local",
+    "routing-architecture"
+  ],
+  [
+    "hardware-envelope",
+    "cp1-hardware-profile"
+  ],
+  [
+    "cp1-hardware-profile",
+    "cp2-model-choice"
+  ],
+  [
+    "cp2-model-choice",
+    "cp3-local-inference"
+  ],
+  [
+    "cp3-local-inference",
+    "cp4-capability-evaluation"
+  ],
+  [
+    "cp4-capability-evaluation",
+    "cp5-routing-decision"
+  ],
+  [
+    "cp5-routing-decision",
+    "my-local-model-plan"
+  ],
+  [
+    "cp2-model-choice",
+    "model-card-lens"
+  ],
+  [
+    "cp2-model-choice",
+    "seleccion-capacidad-vs-compatibilidad"
+  ],
+  [
+    "cp3-local-inference",
+    "fallback-supported"
+  ],
+  [
+    "cp4-capability-evaluation",
+    "evaluacion-situada"
+  ],
+  [
+    "cp5-routing-decision",
+    "routing-architecture"
+  ],
+  [
+    "cp5-routing-decision",
+    "seleccion-capacidad-vs-compatibilidad"
+  ],
+  [
+    "my-local-model-plan",
+    "uso-modelos-locales"
+  ],
+  [
+    "task-write-transform",
+    "cp2-model-choice"
+  ],
+  [
+    "task-analyze-documents",
+    "cp2-model-choice"
+  ],
+  [
+    "task-code-debug",
+    "cp2-model-choice"
+  ],
+  [
+    "task-reason-review",
+    "cp2-model-choice"
+  ],
+  [
+    "task-create-ideate",
+    "cp2-model-choice"
+  ],
+  [
+    "task-write-transform",
+    "cp4-capability-evaluation"
+  ],
+  [
+    "task-analyze-documents",
+    "cp4-capability-evaluation"
+  ],
+  [
+    "task-code-debug",
+    "cp4-capability-evaluation"
+  ],
+  [
+    "task-reason-review",
+    "cp4-capability-evaluation"
+  ],
+  [
+    "task-create-ideate",
+    "cp4-capability-evaluation"
+  ],
+  [
+    "dynamic-direct",
+    "cp4-capability-evaluation"
+  ],
+  [
+    "dynamic-iterative",
+    "cp4-capability-evaluation"
+  ],
+  [
+    "dynamic-critical",
+    "cp4-capability-evaluation"
+  ],
+  [
+    "dynamic-sustained",
+    "cp4-capability-evaluation"
+  ],
+  [
+    "dynamic-sustained",
+    "hardware-envelope"
+  ],
+  [
+    "fallback-supported",
+    "cp4-capability-evaluation"
+  ]
+];
+
+// ═══════════════════════════════════════════
+// GRAPH ENGINE (same as before, compact)
+// ═══════════════════════════════════════════
+let currentLang = 'es';
+const nodeMap = new Map(NODES.map(n => [n.id, n]));
+const validIds = new Set(NODES.map(n => n.id));
+const links = LINK_DATA.filter(([s,t]) => validIds.has(s) && validIds.has(t)).map(([source, target]) => ({ source, target }));
+const linkSet = new Set(); const dedupedLinks = [];
+for (const l of links) { const key = [l.source, l.target].sort().join('||'); if (!linkSet.has(key)) { linkSet.add(key); dedupedLinks.push(l); } }
+const nodes = NODES.map(n => ({ ...n }));
+
+const categoryColors = { framework:{fill:'#bc8cff',glow:'rgba(188,140,255,0.5)'}, checkpoint:{fill:'#58a6ff',glow:'rgba(88,166,255,0.5)'}, artifact:{fill:'#f778ba',glow:'rgba(247,120,186,0.5)'}, task:{fill:'#f85149',glow:'rgba(248,81,73,0.5)'}, dynamic:{fill:'#3fb950',glow:'rgba(63,185,80,0.5)'}, concept:{fill:'#d29922',glow:'rgba(210,153,34,0.5)'} };
+const categoryLabels = { framework:{es:'Marco',en:'Framework'}, checkpoint:{es:'Checkpoints',en:'Checkpoints'}, artifact:{es:'Artefacto final',en:'Final artifact'}, task:{es:'Tareas',en:'Tasks'}, dynamic:{es:'Dinámicas',en:'Dynamics'}, concept:{es:'Conceptos',en:'Concepts'} };
+const nodeRadius = d => d.category === 'framework' ? 10 : d.category === 'checkpoint' ? 8 : d.category === 'artifact' ? 9 : d.category === 'task' ? 7 : 5;
+
+const container = document.getElementById('graph-container');
+const width = window.innerWidth, height = window.innerHeight;
+const svg = d3.select(container).append('svg').attr('width', width).attr('height', height);
+const defs = svg.append('defs');
+Object.entries(categoryColors).forEach(([cat, c]) => { const f = defs.append('filter').attr('id', `glow-${cat}`); f.append('feGaussianBlur').attr('stdDeviation', 4).attr('result', 'blur'); f.append('feFlood').attr('flood-color', c.glow).attr('result', 'color'); f.append('feComposite').attr('in', 'color').attr('in2', 'blur').attr('operator', 'in').attr('result', 'cb'); const m = f.append('feMerge'); m.append('feMergeNode').attr('in', 'cb'); m.append('feMergeNode').attr('in', 'SourceGraphic'); });
+const g = svg.append('g');
+const zoom = d3.zoom().scaleExtent([0.15, 4]).on('zoom', e => g.attr('transform', e.transform)); svg.call(zoom);
+const simulation = d3.forceSimulation(nodes).force('link', d3.forceLink(dedupedLinks).id(d => d.id).distance(90).strength(0.25)).force('charge', d3.forceManyBody().strength(-280)).force('center', d3.forceCenter(width/2, height/2)).force('collision', d3.forceCollide().radius(d => nodeRadius(d)+14)).force('x', d3.forceX(width/2).strength(0.03)).force('y', d3.forceY(height/2).strength(0.03));
+const link = g.append('g').selectAll('line').data(dedupedLinks).join('line').attr('stroke','rgba(139,148,158,0.15)').attr('stroke-width',0.8);
+const nodeGroup = g.append('g'); const node = nodeGroup.selectAll('g').data(nodes).join('g').attr('cursor','pointer').call(d3.drag().on('start',(e,d)=>{if(!e.active)simulation.alphaTarget(0.3).restart();d.fx=d.x;d.fy=d.y;}).on('drag',(e,d)=>{d.fx=e.x;d.fy=e.y;}).on('end',(e,d)=>{if(!e.active)simulation.alphaTarget(0);d.fx=null;d.fy=null;}));
+node.append('circle').attr('r',nodeRadius).attr('fill',d=>categoryColors[d.category].fill).attr('filter',d=>`url(#glow-${d.category})`).attr('opacity',0.9);
+const labels = node.append('text').attr('dx',d=>nodeRadius(d)+4).attr('dy','0.35em').attr('font-size',d=>d.category==='framework'?'9px':'8px').attr('font-family','Inter,sans-serif').attr('font-weight',d=>d.category==='framework'?500:400).attr('fill','rgba(230,237,243,0.7)').attr('pointer-events','none').text(d=>d.label[currentLang]);
+
+const tooltip = document.getElementById('tooltip');
+node.on('mouseover', function(event, d) {
+  const connected = new Set([d.id]); dedupedLinks.forEach(l => { const s=typeof l.source==='object'?l.source.id:l.source, t=typeof l.target==='object'?l.target.id:l.target; if(s===d.id)connected.add(t); if(t===d.id)connected.add(s); });
+  node.select('circle').attr('opacity',n=>connected.has(n.id)?1:0.12); labels.attr('fill',n=>connected.has(n.id)?'rgba(230,237,243,0.9)':'rgba(230,237,243,0.1)');
+  link.attr('stroke',l=>{const s=typeof l.source==='object'?l.source.id:l.source,t=typeof l.target==='object'?l.target.id:l.target;return(s===d.id||t===d.id)?'rgba(139,148,158,0.55)':'rgba(139,148,158,0.04)';}).attr('stroke-width',l=>{const s=typeof l.source==='object'?l.source.id:l.source,t=typeof l.target==='object'?l.target.id:l.target;return(s===d.id||t===d.id)?1.5:0.5;});
+  tooltip.textContent=d.label[currentLang]; tooltip.classList.add('visible'); tooltip.style.left=(event.clientX+14)+'px'; tooltip.style.top=(event.clientY-10)+'px';
+}).on('mousemove',function(event){tooltip.style.left=(event.clientX+14)+'px';tooltip.style.top=(event.clientY-10)+'px';})
+.on('mouseout',function(){node.select('circle').attr('opacity',0.9);labels.attr('fill','rgba(230,237,243,0.7)');link.attr('stroke','rgba(139,148,158,0.15)').attr('stroke-width',0.8);tooltip.classList.remove('visible');});
+
+node.on('click', function(event, d) { event.stopPropagation(); openPanel(d); });
+svg.on('click', () => closePanel());
+
+// ═══════════════════════════════════════════
+// PANEL RENDERING WITH FULL CONTENT
+// ═══════════════════════════════════════════
+function renderTable(rows) {
+  if (!rows || rows.length < 2) return '';
+  const [header, ...body] = rows;
+  return `<table class="detail-table"><thead><tr>${header.map(h=>`<th>${h}</th>`).join('')}</tr></thead><tbody>${body.map(r=>`<tr>${r.map(c=>`<td>${c}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+function renderRefs(refs) {
+  if (!refs) return '';
+  let html = '';
+  const sharedLabel = currentLang === 'es' ? 'Referencias compartidas' : 'Shared references';
+  const specificLabel = currentLang === 'es' ? 'Referencias específicas' : 'Specific references';
+  if (refs.shared && refs.shared.length) {
+    html += `<div class="ref-group-label">${sharedLabel}</div>`;
+    refs.shared.forEach(r => { html += `<div class="ref-item">${r.text}<br><a href="${r.url}" target="_blank" rel="noopener">${r.url}</a></div>`; });
+  }
+  if (refs.specific && refs.specific.length) {
+    html += `<div class="ref-group-label">${specificLabel}</div>`;
+    refs.specific.forEach(r => { html += `<div class="ref-item">${r.text}<br><a href="${r.url}" target="_blank" rel="noopener">${r.url}</a></div>`; });
+  }
+  return html;
+}
+
+function openPanel(d) {
+  const connections = [];
+  dedupedLinks.forEach(l => { const s=typeof l.source==='object'?l.source.id:l.source, t=typeof l.target==='object'?l.target.id:l.target; if(s===d.id&&nodeMap.has(t))connections.push(nodeMap.get(t)); if(t===d.id&&nodeMap.has(s))connections.push(nodeMap.get(s)); });
+  const catLabel = categoryLabels[d.category][currentLang];
+  const connLabel = currentLang === 'es' ? 'Conexiones' : 'Connections';
+  const quickTableLabel = currentLang === 'es' ? 'Ficha rápida' : 'Quick Table';
+  const refsLabel = currentLang === 'es' ? 'Referencias públicas' : 'Public References';
+
+  let html = `<span class="detail-category ${d.category}">${catLabel}</span><h2 class="detail-title">${d.label[currentLang]}</h2><p class="detail-description">${d.desc[currentLang]}</p>`;
+
+  // Quick Table
+  if (d.quickTable && d.quickTable[currentLang]) {
+    html += `<details class="detail-collapsible" open><summary>${quickTableLabel}</summary><div class="inner">`;
+    html += `<table class="detail-table"><tbody>${d.quickTable[currentLang].map(([k,v])=>`<tr><td style="width:35%;font-weight:600;color:var(--text)">${k}</td><td>${v}</td></tr>`).join('')}</tbody></table></div></details>`;
+  }
+
+  // Extra tables
+  if (d.extraTables && d.extraTables[currentLang]) {
+    Object.entries(d.extraTables[currentLang]).forEach(([title, rows]) => {
+      html += `<details class="detail-collapsible"><summary>${title}</summary><div class="inner">${renderTable(rows)}</div></details>`;
+    });
+  }
+
+  // Connections
+  if (connections.length) {
+    html += `<details class="detail-collapsible" open><summary>${connLabel} (${connections.length})</summary><div class="inner"><div class="detail-connections">${connections.map(c=>`<span class="detail-conn-chip" onclick="navigateTo('${c.id}')">${c.label[currentLang]}</span>`).join('')}</div></div></details>`;
+  }
+
+  // References
+  if (d.refs) {
+    const refHtml = renderRefs(d.refs);
+    if (refHtml) { html += `<details class="detail-collapsible"><summary>${refsLabel}</summary><div class="inner">${refHtml}</div></details>`; }
+  }
+
+  document.getElementById('detail-content').innerHTML = html;
+  document.getElementById('detail-panel').classList.add('open');
+}
+
+function closePanel() { document.getElementById('detail-panel').classList.remove('open'); }
+window.navigateTo = function(id) { const n = nodes.find(nd => nd.id === id); if (n) openPanel(n); };
+
+simulation.on('tick', () => {
+  link.attr('x1',d=>d.source.x).attr('y1',d=>d.source.y).attr('x2',d=>d.target.x).attr('y2',d=>d.target.y);
+  node.attr('transform',d=>`translate(${d.x},${d.y})`);
+});
+
+// Legend
+function renderLegend() {
+  const cats = ['framework','checkpoint','artifact','task','dynamic','concept'];
+  const counts = {}; cats.forEach(c=>counts[c]=nodes.filter(n=>n.category===c).length);
+  document.getElementById('legend-items').innerHTML = cats.map(c=>`<div class="legend-item"><span class="legend-dot" style="background:${categoryColors[c].fill};box-shadow:0 0 6px ${categoryColors[c].glow}"></span><span>${categoryLabels[c][currentLang]} (${counts[c]})</span></div>`).join('');
+  document.getElementById('legend-label').textContent = currentLang === 'es' ? 'Leyenda' : 'Legend';
+}
+let legendCollapsed = false;
+window.toggleLegend = function() {
+  const legend = document.getElementById('legend');
+  const btn = document.getElementById('legend-toggle');
+  legendCollapsed = !legendCollapsed;
+  legend.classList.toggle('collapsed', legendCollapsed);
+  btn.textContent = legendCollapsed ? '+' : '−';
+  btn.title = legendCollapsed ? (currentLang === 'es' ? 'Expandir' : 'Expand') : (currentLang === 'es' ? 'Minimizar' : 'Minimize');
+};
+renderLegend();
+document.getElementById('node-count').textContent = `${nodes.length} nodos · ${dedupedLinks.length} conexiones`;
+
+// Search
+const searchInput = document.getElementById('search');
+searchInput.addEventListener('input', function() {
+  const q = this.value.toLowerCase().trim();
+  if (!q) { node.select('circle').attr('opacity',0.9); labels.attr('fill','rgba(230,237,243,0.7)'); link.attr('stroke','rgba(139,148,158,0.15)').attr('stroke-width',0.8); return; }
+  const matches = new Set(); nodes.forEach(n => { if(n.label[currentLang].toLowerCase().includes(q)||n.id.includes(q)) matches.add(n.id); });
+  node.select('circle').attr('opacity',n=>matches.has(n.id)?1:0.08); labels.attr('fill',n=>matches.has(n.id)?'#fff':'rgba(230,237,243,0.08)');
+  if (matches.size===1) { const mid=[...matches][0]; const conn=new Set([mid]); dedupedLinks.forEach(l=>{const s=typeof l.source==='object'?l.source.id:l.source,t=typeof l.target==='object'?l.target.id:l.target;if(s===mid)conn.add(t);if(t===mid)conn.add(s);}); node.select('circle').attr('opacity',n=>conn.has(n.id)?1:0.08); labels.attr('fill',n=>conn.has(n.id)?'rgba(230,237,243,0.9)':'rgba(230,237,243,0.08)'); link.attr('stroke',l=>{const s=typeof l.source==='object'?l.source.id:l.source,t=typeof l.target==='object'?l.target.id:l.target;return(s===mid||t===mid)?'rgba(139,148,158,0.55)':'rgba(139,148,158,0.03)';}); }
+});
+
+// Language toggle
+window.setLang = function(lang) {
+  currentLang = lang;
+  document.getElementById('btn-es').classList.toggle('active', lang==='es');
+  document.getElementById('btn-en').classList.toggle('active', lang==='en');
+  labels.text(d => d.label[currentLang]);
+  document.getElementById('main-title').textContent = lang==='es' ? 'Uso de Modelos Locales · Grafo Curricular' : 'Using Local Models · Curriculum Graph';
+  document.getElementById('node-count').textContent = lang==='es' ? `${nodes.length} nodos · ${dedupedLinks.length} conexiones` : `${nodes.length} nodes · ${dedupedLinks.length} connections`;
+  searchInput.placeholder = lang==='es' ? 'Buscar nodo...' : 'Search node...';
+  renderLegend();
+  document.getElementById('instr-title').textContent = lang==='es' ? 'Navegación' : 'Navigation';
+  document.getElementById('instr-drag').textContent = lang==='es' ? 'Arrastrar' : 'Drag';
+  document.getElementById('instr-click').textContent = lang==='es' ? 'Clic' : 'Click';
+  document.documentElement.lang = lang;
+};
+
+window.addEventListener('resize', () => { svg.attr('width',window.innerWidth).attr('height',window.innerHeight); simulation.force('center',d3.forceCenter(window.innerWidth/2,window.innerHeight/2)); simulation.alpha(0.1).restart(); });
+setTimeout(() => { const p=60; let x0=Infinity,x1=-Infinity,y0=Infinity,y1=-Infinity; nodes.forEach(n=>{if(n.x<x0)x0=n.x;if(n.x>x1)x1=n.x;if(n.y<y0)y0=n.y;if(n.y>y1)y1=n.y;}); const dx=x1-x0+p*2,dy=y1-y0+p*2,s=Math.min(width/dx,height/dy,1.2),cx=(x0+x1)/2,cy=(y0+y1)/2; svg.transition().duration(1000).call(zoom.transform,d3.zoomIdentity.translate(width/2,height/2).scale(s).translate(-cx,-cy)); }, 2500);
+setTimeout(() => { document.getElementById('instructions').style.opacity='0'; setTimeout(()=>document.getElementById('instructions').style.display='none',600); }, 12000);
+</script>
+</body>
+</html>
+
